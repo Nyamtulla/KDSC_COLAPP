@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Example usage of the Receipt OCR Script
-Demonstrates how to use the OCR functionality programmatically.
+Example usage of the Simple Receipt OCR Script
+Demonstrates how to use the simplified OCR functionality that matches the Flask app.
 """
 
 import json
-from ocr import ReceiptOCR
+from ocr import SimpleReceiptOCR
 
 def example_usage():
-    """Example of how to use the ReceiptOCR class"""
+    """Example of how to use the SimpleReceiptOCR class"""
     
     # Initialize the OCR processor
-    ocr = ReceiptOCR()
+    ocr = SimpleReceiptOCR()
     
     # Example 1: Process a receipt image
     try:
@@ -19,40 +19,14 @@ def example_usage():
         image_path = r"backend\debug_uploaded_image.jpg"
         #image_path = r"backend\uploads\fd88fdf8-f850-4f46-bc84-f8b10ae0c4b9_receipt.jpg"
         
-        print("Processing receipt with standard preprocessing...")
-        # Try standard preprocessing first
-        receipt_data = ocr.process_receipt(image_path, save_processed=True, use_alternative=False)
+        print("Processing receipt with simple OCR (matching Flask app approach)...")
+        receipt_data = ocr.process_receipt(image_path)
         
-        print("Standard preprocessing results:")
+        print("OCR Results:")
         print(f"Store: {receipt_data.store_name}")
         print(f"Total: ${receipt_data.total_amount:.2f}")
         print(f"Items found: {len(receipt_data.items)}")
         print(f"Raw text length: {len(receipt_data.raw_text)}")
-        
-        print("\n" + "="*50 + "\n")
-        
-        print("Processing receipt with alternative preprocessing (thinner characters)...")
-        # Try alternative preprocessing for thinner characters
-        receipt_data_alt = ocr.process_receipt(image_path, save_processed=True, use_alternative=True)
-        
-        print("Alternative preprocessing results:")
-        print(f"Store: {receipt_data_alt.store_name}")
-        print(f"Total: ${receipt_data_alt.total_amount:.2f}")
-        print(f"Items found: {len(receipt_data_alt.items)}")
-        print(f"Raw text length: {len(receipt_data_alt.raw_text)}")
-        
-        # Compare results
-        print("\n" + "="*50 + "\n")
-        print("COMPARISON:")
-        print(f"Standard preprocessing - Items: {len(receipt_data.items)}, Text length: {len(receipt_data.raw_text)}")
-        print(f"Alternative preprocessing - Items: {len(receipt_data_alt.items)}, Text length: {len(receipt_data_alt.raw_text)}")
-        
-        # Use the better result (more items or longer text)
-        if len(receipt_data_alt.items) > len(receipt_data.items) or len(receipt_data_alt.raw_text) > len(receipt_data.raw_text):
-            receipt_data = receipt_data_alt
-            print("Using alternative preprocessing results (better OCR)")
-        else:
-            print("Using standard preprocessing results")
         
         print(receipt_data)
         # Convert to JSON
@@ -65,7 +39,6 @@ def example_usage():
         # Access individual fields
         print(f"\nStore: {receipt_data.store_name}")
         print(f"Total: ${receipt_data.total_amount:.2f}")
-        print(f"Date: {receipt_data.date}")
         print(f"Number of items: {len(receipt_data.items)}")
         
         # Print each product
@@ -96,44 +69,41 @@ def example_with_mock_data():
             quantity=1,
             unit_price=3.99,
             total_price=3.99,
-            category="Dairy"
+            category="Other"
         ),
         Product(
             name="Bread Whole Wheat",
             quantity=2,
             unit_price=2.49,
             total_price=4.98,
-            category="Bakery"
+            category="Other"
         ),
         Product(
             name="Bananas",
             quantity=1,
             unit_price=1.99,
             total_price=1.99,
-            category="Produce"
+            category="Other"
         ),
         Product(
             name="Chicken Breast",
             quantity=1,
             unit_price=12.99,
             total_price=12.99,
-            category="Meat"
+            category="Other"
         )
     ]
     
     # Create receipt data
     receipt_data = ReceiptData(
         store_name="Walmart",
-        total_amount=25.95,
-        subtotal=23.95,
-        tax_amount=2.00,
-        date="2024-01-15",
+        total_amount=21.46,
         items=products,
         raw_text="Sample receipt text..."
     )
     
     # Convert to JSON
-    ocr = ReceiptOCR()
+    ocr = SimpleReceiptOCR()
     json_output = ocr.to_json(receipt_data, include_raw_text=False)
     
     print("Example Receipt Data (JSON):")
@@ -145,9 +115,6 @@ def example_with_mock_data():
     print(f"\nParsed Data:")
     print(f"Store: {data_dict['store_name']}")
     print(f"Total: ${data_dict['total_amount']}")
-    print(f"Subtotal: ${data_dict['subtotal']}")
-    print(f"Tax: ${data_dict['tax_amount']}")
-    print(f"Date: {data_dict['date']}")
     print(f"Items: {len(data_dict['items'])}")
     
     print("\nProducts:")
@@ -160,15 +127,14 @@ def example_with_mock_data():
         print()
 
 if __name__ == "__main__":
-    print("=== Receipt OCR Example Usage ===\n")
+    print("=== Simple Receipt OCR Example Usage ===\n")
     
-    # print("1. Example with mock data:")
-    # #example_with_mock_data()
+    print("1. Example with mock data:")
+    example_with_mock_data()
     
-    # print("\n" + "="*50 + "\n")
+    print("\n" + "="*50 + "\n")
     
-    # print("2. Example with actual image (commented out):")
-    # print("# Uncomment the line below and provide a valid image path")
+    print("2. Example with actual image:")
     example_usage()
     
     print("\nTo use with an actual image:")
