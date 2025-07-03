@@ -50,17 +50,68 @@ class SimpleReceiptOCR:
             re.compile(r'\$?(\d+\.\d{2})$')
         ]
         
-        # Item pattern for @ format: [product name] [count] @ [unit price] [total price at end]
-        self.item_pattern_at = re.compile(r'(.+?)\s+(\d+)\s*@\s*\$?(\d+\.\d{2})\s+\$?(\d+\.\d{2})\s*$')
-        
-        # Alternative pattern for @ format with possible single char before total: [product name] [count] @ [unit price] [char][total price]
-        self.item_pattern_at_alt = re.compile(r'(.+?)\s+(\d+)\s*@\s*\$?(\d+\.\d{2})\s+[A-Za-z]?\$?(\d+\.\d{2})\s*$')
-        
-        # Flexible pattern for @ format: [product name] [count] @ [unit price] ... [total price]
-        self.item_pattern_at_flexible = re.compile(r'(.+?)\s+(\d+)\s*@\s*\$?(\d+\.\d{2}).*?(\d+\.\d{2})\s*$')
-        
-        # Fallback item pattern (same as in Flask app)
-        self.item_pattern_fallback = re.compile(r'(.+?)\s+\$?(\d+\.\d{2})')
+        # Multiple regex patterns for different receipt formats
+        self.regex_patterns = [
+            # Pattern 1: Store product format (e.g., "E 673919 FF BS BREAST 23.99 E")
+            re.compile(r'^[A-Z]\s+\d+\s+([A-Z\s]+)\s+(\d+\.\d{2})\s+[A-Z]$'),
+            
+            # Pattern 2: Product with barcode and price (e.g., "404609 ECO HALF PAN 6.49 A")
+            re.compile(r'^\d+\s+([A-Z\s]+)\s+(\d+\.\d{2})\s+[A-Z]$'),
+            
+            # Pattern 3: Product name with barcode (e.g., "RUFFLES 002840020942 F")
+            re.compile(r'^([A-Z\s]+)\s+(\d{12,13})\s+[A-Z]$'),
+            
+            # Pattern 4: Product name with short code (e.g., "BAGELS 001", "GV SLIDERS")
+            re.compile(r'^([A-Z\s]+)\s+(\d{1,6})$'),
+            
+            # Pattern 5: Product name with price and suffix (e.g., "SEA SALT POT CHP $1.29 §")
+            re.compile(r'^([A-Z\s]+)\s+\$?(\d+\.\d{2})\s*[§A-Z]?$'),
+            
+            # Pattern 6: Product name with price and letter suffix (e.g., "BRAIDED BRIOCHE $6.99 F")
+            re.compile(r'^([A-Z\s]+)\s+\$?(\d+\.\d{2})\s+[A-Z]$'),
+            
+            # Pattern 7: Product name with price and colon (e.g., "CHEF PLATE MEAL $10 :")
+            re.compile(r'^([A-Z\s]+)\s+\$?(\d+\.?\d*)\s*:?$'),
+            
+            # Pattern 8: Quantity @ Unit Price ea Total (e.g., "2 @ $10.00 ea $20.00 F")
+            re.compile(r'^(\d+)\s+@\s+\$?(\d+\.\d{2})\s+ea\s+\$?(\d+\.\d{2})\s*[A-Z]?$'),
+            
+            # Pattern 9: Product with barcode and price (e.g., "Su HRO FGHTR 06305094073 6.94 T")
+            re.compile(r'^(.+?)\s+(\d{11,12})\s+(\d+\.\d{2})\s+[A-Z]$'),
+            
+            # Pattern 10: Quantity + Product Name + Price with commas (e.g., "2 Ham Cheese 74, 000")
+            re.compile(r'^\s*(\d+)\s+([A-Za-z\s&()]+)\s+([\d,\s]+)$'),
+            
+            # Pattern 11: Quantity + Product Name + Price (e.g., "2 MILK 3.98")
+            re.compile(r'^\s*(\d+)\s+([A-Za-z\s&]+)\s+([\d,]+\.?\d*)$'),
+            
+            # Pattern 12: Product Name + Price (e.g., "MILK $1.99")
+            re.compile(r'^([A-Za-z\s&]+)\s+\$?(\d+\.\d{2})$'),
+            
+            # Pattern 13: Product Name + Weight + @ + Unit Price + Total (e.g., "BANANAS 2.5 lb @ 0.99 2.48")
+            re.compile(r'^(.+?)\s+(\d+\.\d+)\s+lb\s+@\s+(\d+\.\d+)\s+.*?(\d+\.\d+)$'),
+            
+            # Pattern 14: Product Name + Price (fallback)
+            re.compile(r'^(.+?)\s+\$?(\d+\.\d{2})$'),
+            
+            # Pattern 15: Product Name + Quantity @ Unit Price + Total (e.g., "MILK 2 @ $1.99 $3.98")
+            re.compile(r'^(.+?)\s+(\d+)\s*@\s*\$?(\d+\.\d{2})\s+\$?(\d+\.\d{2})\s*$'),
+            
+            # Pattern 16: Product Name + Quantity @ Unit Price + Char + Total (e.g., "BREAD 2 @ $2.49 T$4.98")
+            re.compile(r'^(.+?)\s+(\d+)\s*@\s*\$?(\d+\.\d{2})\s+[A-Za-z]?\$?(\d+\.\d{2})\s*$'),
+            
+            # Pattern 17: Product Name + Quantity @ Unit Price + ... + Total (flexible)
+            re.compile(r'^(.+?)\s+(\d+)\s*@\s*\$?(\d+\.\d{2}).*?(\d+\.\d{2})\s*$'),
+            
+            # Pattern 18: Product Name + Unit Price x Quantity = Total (e.g., "MILK $1.99 x 2 = $3.98")
+            re.compile(r'^(.+?)\s+\$?(\d+\.\d{2})\s+x\s+(\d+)\s*=\s*\$?(\d+\.\d{2})$'),
+            
+            # Pattern 19: Product Name + Quantity for Unit Price Total (e.g., "BREAD 2 for $2.49 $4.98")
+            re.compile(r'^(.+?)\s+(\d+)\s+for\s+\$?(\d+\.\d{2})\s+\$?(\d+\.\d{2})$'),
+            
+            # Pattern 20: Handle lines starting with "]" (OCR error) - treat as quantity 1
+            re.compile(r'^\s*\]\s+([A-Za-z\s&()]+)\s+([\d,\s]+)$')
+        ]
 
     def extract_text(self, image_path: str) -> str:
         """Extract text from image using OCR - simple approach like Flask app"""
@@ -120,7 +171,7 @@ class SimpleReceiptOCR:
         return total_amount
 
     def extract_products(self, text: str) -> List[Product]:
-        """Extract product information from receipt text - handles @ format"""
+        """Extract product information from receipt text using multiple regex patterns"""
         products = []
         lines = text.split('\n')
 
@@ -130,77 +181,178 @@ class SimpleReceiptOCR:
                 continue
             
             # Skip lines that are likely not products
-            if any(skip in line.upper() for skip in ['TOTAL', 'TAX', 'SUBTOTAL', 'BALANCE', 'THANK', 'RECEIPT', 'DATE', 'TIME']):
+            if any(skip in line.upper() for skip in ['TOTAL', 'TAX', 'SUBTOTAL', 'BALANCE', 'THANK', 'RECEIPT', 'DATE', 'TIME', 'CHANGE', 'CHECK', 'MEMBER', 'PRNTD', 'NUMBER', 'SOLD', 'WHSE', 'TRM', 'TRN', 'OP', 'NET SALES', 'TAK', 'CASH TEND', 'EFT DEBIT', 'ACCOUNT', 'REF', 'NETWORK', 'TERMINAL', 'ITEMS SOLD', 'TCR']):
                 continue
             
-            # Try @ format first: [product name] [count] @ [unit price] [total price]
-            match = self.item_pattern_at.match(line)
-            if match:
-                product_name = match.group(1).strip()
-                quantity = int(match.group(2))
-                unit_price = float(match.group(3))
-                total_price = float(match.group(4))
-                
-                if product_name.lower() not in ['total', 'tax', 'subtotal', 'amount']:
-                    products.append(Product(
-                        name=product_name,
-                        quantity=quantity,
-                        unit_price=unit_price,
-                        total_price=total_price,
-                        category='Other'
-                    ))
+            # Skip lines that are just numbers (like "38 4.29")
+            if re.match(r'^\s*\d+\s+\d+\.\d{2}\s*$', line):
                 continue
             
-            # Try alternative @ format
-            match = self.item_pattern_at_alt.match(line)
-            if match:
-                product_name = match.group(1).strip()
-                quantity = int(match.group(2))
-                unit_price = float(match.group(3))
-                total_price = float(match.group(4))
-                
-                if product_name.lower() not in ['total', 'tax', 'subtotal', 'amount']:
-                    products.append(Product(
-                        name=product_name,
-                        quantity=quantity,
-                        unit_price=unit_price,
-                        total_price=total_price,
-                        category='Other'
-                    ))
-                continue
-            
-            # Try flexible @ format
-            match = self.item_pattern_at_flexible.match(line)
-            if match:
-                product_name = match.group(1).strip()
-                quantity = int(match.group(2))
-                unit_price = float(match.group(3))
-                total_price = float(match.group(4))
-                
-                if product_name.lower() not in ['total', 'tax', 'subtotal', 'amount']:
-                    products.append(Product(
-                        name=product_name,
-                        quantity=quantity,
-                        unit_price=unit_price,
-                        total_price=total_price,
-                        category='Other'
-                    ))
-                continue
-            
-            # Fallback to simple format: [product name] [price]
-            match = self.item_pattern_fallback.match(line)
-            if match:
-                product_name = match.group(1).strip()
-                price = float(match.group(2))
-                
-                if product_name.lower() not in ['total', 'tax', 'subtotal', 'amount']:
-                    products.append(Product(
-                        name=product_name,
-                        quantity=1,
-                        unit_price=price,
-                        total_price=price,
-                        category='Other'
-                    ))
+            # Try each regex pattern
+            for pattern in self.regex_patterns:
+                match = pattern.match(line)
+                if match:
+                    groups = match.groups()
+
+                    
+                    # Pattern 1: Store product format (e.g., "E 673919 FF BS BREAST 23.99 E")
+                    if len(groups) == 2 and line.startswith('E ') and line.endswith(' E'):
+                        product_name = groups[0].strip()
+                        price = float(groups[1])
+                        quantity = 1
+                        unit_price = price
+                        total_price = price
+                        
+                    # Pattern 2: Product with barcode and price (e.g., "404609 ECO HALF PAN 6.49 A")
+                    elif len(groups) == 2 and line[0].isdigit() and line.endswith(' A'):
+                        product_name = groups[0].strip()
+                        price = float(groups[1])
+                        quantity = 1
+                        unit_price = price
+                        total_price = price
+                        
+                    # Pattern 3: Product name with barcode (e.g., "RUFFLES 002840020942 F")
+                    elif len(groups) == 2 and len(groups[1]) >= 12 and groups[1].isdigit():
+                        product_name = groups[0].strip()
+                        # For barcode items without price, skip
+                        continue
+                        
+                    # Pattern 4: Product name with short code (e.g., "BAGELS 001", "GV SLIDERS")
+                    elif len(groups) == 2 and len(groups[1]) <= 6 and groups[1].isdigit():
+                        product_name = groups[0].strip()
+                        # For items without price, skip
+                        continue
+                        
+                    # Pattern 5: Product name with price and suffix (e.g., "SEA SALT POT CHP $1.29 §")
+                    elif len(groups) == 2 and '.' in groups[1] and groups[1].replace('.', '').isdigit():
+                        product_name = groups[0].strip()
+                        price = float(groups[1])
+                        quantity = 1
+                        unit_price = price
+                        total_price = price
+                        
+                    # Pattern 6: Product name with price and letter suffix (e.g., "BRAIDED BRIOCHE $6.99 F")
+                    elif len(groups) == 2 and '.' in groups[1] and groups[1].replace('.', '').isdigit():
+                        product_name = groups[0].strip()
+                        price = float(groups[1])
+                        quantity = 1
+                        unit_price = price
+                        total_price = price
+                        
+                    # Pattern 7: Product name with price and colon (e.g., "CHEF PLATE MEAL $10 :")
+                    elif len(groups) == 2 and '.' in groups[1] and groups[1].replace('.', '').isdigit():
+                        product_name = groups[0].strip()
+                        price = float(groups[1])
+                        quantity = 1
+                        unit_price = price
+                        total_price = price
+                        
+                    # Pattern 8: Quantity @ Unit Price ea Total (e.g., "2 @ $10.00 ea $20.00 F")
+                    elif len(groups) == 3 and groups[0].isdigit() and '@' in line and 'ea' in line:
+                        quantity = int(groups[0])
+                        unit_price = float(groups[1])
+                        total_price = float(groups[2])
+                        product_name = f"Item {len(products) + 1}"  # Generic name
+                        
+                    # Pattern 9: Product with barcode and price (e.g., "Su HRO FGHTR 06305094073 6.94 T")
+                    elif len(groups) == 3 and len(groups[1]) >= 11 and groups[1].isdigit():
+                        product_name = groups[0].strip()
+                        price = float(groups[2])
+                        quantity = 1
+                        unit_price = price
+                        total_price = price
+                        
+                    # Pattern 10/11/11b/11c: Quantity + Product Name + Price (e.g., "2 MILK 3.98", "1 Woman 0", "2 Ham Cheese 74, 000")
+                    elif len(groups) == 3 and groups[0].isdigit():
+                        quantity = int(groups[0])
+                        product_name = groups[1].strip()
+                        try:
+                            total_price = float(groups[2].replace(',', '').replace(' ', ''))
+                        except ValueError:
+                            continue
+                        unit_price = total_price / quantity if quantity > 0 else total_price
+                        
+                    # Pattern 12: Product Name + Price
+                    elif len(groups) == 2 and '.' in groups[1] and groups[1].replace('.', '').isdigit():
+                        product_name = groups[0].strip()
+                        price = float(groups[1])
+                        quantity = 1
+                        unit_price = price
+                        total_price = price
+                        
+                    # Pattern 13: Product Name + Weight + @ + Unit Price + Total
+                    elif len(groups) == 4 and 'lb' in line:
+                        product_name = groups[0].strip()
+                        weight = float(groups[1])
+                        unit_price = float(groups[2])
+                        total_price = float(groups[3])
+                        quantity = 1  # Treat weight as quantity for pricing
+                        
+                    # Pattern 14: Product Name + Price (fallback)
+                    elif len(groups) == 2 and '.' in groups[1] and groups[1].replace('.', '').isdigit():
+                        product_name = groups[0].strip()
+                        price = float(groups[1])
+                        quantity = 1
+                        unit_price = price
+                        total_price = price
+                        
+                    # Pattern 15: Product Name + Quantity @ Unit Price + Total
+                    elif len(groups) == 4 and groups[1].isdigit():
+                        product_name = groups[0].strip()
+                        quantity = int(groups[1])
+                        unit_price = float(groups[2])
+                        total_price = float(groups[3])
+                        
+                    # Pattern 16: Product Name + Quantity @ Unit Price + Char + Total
+                    elif len(groups) == 4 and groups[1].isdigit():
+                        product_name = groups[0].strip()
+                        quantity = int(groups[1])
+                        unit_price = float(groups[2])
+                        total_price = float(groups[3])
+                        
+                    # Pattern 17: Product Name + Quantity @ Unit Price + ... + Total (flexible)
+                    elif len(groups) == 4 and groups[1].isdigit():
+                        product_name = groups[0].strip()
+                        quantity = int(groups[1])
+                        unit_price = float(groups[2])
+                        total_price = float(groups[3])
+                        
+                    # Pattern 18: Product Name + Unit Price x Quantity = Total
+                    elif len(groups) == 4 and 'x' in line and '=' in line:
+                        product_name = groups[0].strip()
+                        unit_price = float(groups[1])
+                        quantity = int(groups[2])
+                        total_price = float(groups[3])
+                        
+                    # Pattern 19: Product Name + Quantity for Unit Price Total
+                    elif len(groups) == 4 and 'for' in line:
+                        product_name = groups[0].strip()
+                        quantity = int(groups[1])
+                        unit_price = float(groups[2])
+                        total_price = float(groups[3])
+                        
+                    # Pattern 20: Handle lines starting with "]" (OCR error) - treat as quantity 1
+                    elif len(groups) == 2 and line.strip().startswith(']'):
+                        quantity = 1
+                        product_name = groups[0].strip()
+                        # Remove commas and spaces from price
+                        price_str = groups[1].replace(',', '').replace(' ', '')
+                        total_price = float(price_str)
+                        unit_price = total_price
+                        
+                    else:
+                        continue
+                    
+                    # Validate product name
+                    if product_name.lower() not in ['total', 'tax', 'subtotal', 'amount'] and len(product_name.strip()) > 0:
+                        products.append(Product(
+                            name=product_name,
+                            quantity=quantity,
+                            unit_price=round(unit_price, 2),
+                            total_price=round(total_price, 2),
+                            category='Other'
+                        ))
+                    break
 
         return products
 
