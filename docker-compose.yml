@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./colapp/backend
+    container_name: colapp-backend
+    command: python app.py
+    volumes:
+      - ./colapp/backend:/app
+      - ./colapp/backend/uploads:/app/uploads
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - SQLALCHEMY_DATABASE_URI=postgresql://postgres:colapp@db:5432/grocery_app_db
+      - JWT_SECRET_KEY=super-secret-key
+    depends_on:
+      - redis
+      - ollama
+      - db
+
+  worker:
+    build: ./colapp/backend
+    container_name: colapp-worker
+    command: python -m rq.cli worker -w rq.SimpleWorker
+    volumes:
+      - ./colapp/backend:/app
+      - ./colapp/backend/uploads:/app/uploads
+    environment:
+      - SQLALCHEMY_DATABASE_URI=postgresql://postgres:colapp@db:5432/grocery_app_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+      - ollama
+      - db
+
+  redis:
+    image: redis:7
+    container_name: colapp-redis
+    ports:
+      - "6379:6379"
+
+  ollama:
+    image: ollama/ollama
+    container_name: colapp-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  db:
+    image: postgres:15
+    container_name: colapp-db
+    environment:
+      - POSTGRES_DB=grocery_app_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=colapp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  ollama_data:
+  pgdata: 
