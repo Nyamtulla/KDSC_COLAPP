@@ -3,7 +3,7 @@ name: Deploy Flutter Web to GitHub Pages
 on:
   push:
     branches:
-      - v3-dockerized  # Change this if your default branch is different
+      - main  # Change this if your default branch is different
 
 jobs:
   build:
