@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Python
 __pycache__/
 *.py[cod]
@@ -88,3 +89,7 @@ yarn-error.log*
 *.temp
 temp/
 tmp/ 
+=======
+# Ignore uploaded receipt images
+colapp/backend/uploads/ 
+>>>>>>> v3-dockerized

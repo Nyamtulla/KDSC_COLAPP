@@ -1,0 +1,41 @@
+name: colapp
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  image_picker: ^1.1.2
+  image_cropper: ^9.1.0
+  dropdown_search: ^5.0.6
+  google_fonts: ^6.2.0
+  http: ^1.2.1
+  google_mlkit_text_recognition: ^0.11.0
+  google_mlkit_commons: ^0.6.1
+  js: ^0.6.7
+  fl_chart: ^0.66.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+      # or to include all in the folder:
+      - assets/
+
+fonts:
+  - family: Pacifico
+    fonts:
+      - asset: assets/fonts/Pacifico-Regular.ttf
+  - family: Roboto
+    fonts:
+      - asset: assets/fonts/Roboto-Regular.ttf
+      - asset: assets/fonts/Roboto-Bold.ttf
