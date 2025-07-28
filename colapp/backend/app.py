@@ -43,7 +43,7 @@ app = Flask(__name__)
 # Configure CORS to allow requests from GitHub Pages and local development
 CORS(app, origins=[
     "https://nyamtull.github.io",      # Your GitHub Pages URL
-    "https://nyamtull.github.io/colapp", # Your specific project URL
+    "https://nyamtull.github.io/KDSC_COLAPP", # Your specific project URL
     "http://localhost:3000",           # For local development
     "http://localhost:8080",           # For local development
     "http://127.0.0.1:3000",          # For local development
