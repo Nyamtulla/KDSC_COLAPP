@@ -8,7 +8,7 @@ class ApiService {
   // Use different URLs for web vs mobile
   static String get baseUrl {
     if (kIsWeb) {
-      return 'https://34.69.193.108'; // For web (HTTPS)
+      return 'https://strike-belle-offered-header.trycloudflare.com'; // For web (Cloudflare Tunnel)
     } else {
       // For Android emulator, use 10.0.2.2 to access host machine
       return 'http://10.0.2.2:5000';
