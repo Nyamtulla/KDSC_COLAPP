@@ -40,7 +40,15 @@ except ImportError:
     print("Warning: Offline parsing components not available")
 
 app = Flask(__name__)
-CORS(app)
+# Configure CORS to allow requests from GitHub Pages and local development
+CORS(app, origins=[
+    "https://nyamtull.github.io",      # Your GitHub Pages URL
+    "https://nyamtull.github.io/colapp", # Your specific project URL
+    "http://localhost:3000",           # For local development
+    "http://localhost:8080",           # For local development
+    "http://127.0.0.1:3000",          # For local development
+    "http://127.0.0.1:8080"           # For local development
+])
 
 # === Configure DB ===
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI', 'postgresql://postgres:colapp@host.docker.internal:5432/grocery_app_db')
@@ -656,6 +664,15 @@ def get_offline_parser_status():
             'available': False,
             'error': str(e)
         })
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy', 
+        'message': 'ColApp API is running',
+        'version': '1.0.0',
+        'backend_ip': '34.69.193.108'
+    }), 200
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
