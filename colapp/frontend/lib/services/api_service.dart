@@ -8,7 +8,7 @@ class ApiService {
   // Use different URLs for web vs mobile
   static String get baseUrl {
     if (kIsWeb) {
-      return 'http://api.nyamshaik.me'; // For web (HTTP temporarily)
+      return 'https://api.nyamshaik.me'; // For web (HTTPS)
     } else {
       // For Android emulator, use 10.0.2.2 to access host machine
       return 'http://10.0.2.2:5000';
