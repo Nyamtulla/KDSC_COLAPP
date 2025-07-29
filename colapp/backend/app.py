@@ -673,7 +673,7 @@ def health_check():
         'status': 'healthy', 
         'message': 'ColApp API is running',
         'version': '1.0.0',
-        'backend_ip': '34.69.193.108'
+        'backend_ip': '34.57.48.173'
     }), 200
 
 if __name__ == "__main__":
