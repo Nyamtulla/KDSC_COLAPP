@@ -42,9 +42,10 @@ except ImportError:
 app = Flask(__name__)
 # Configure CORS to allow requests from GitHub Pages and local development
 CORS(app, origins=[
+    "https://nyamshaik.me",            # Your custom domain (HTTPS)
+    "http://nyamshaik.me",             # Your custom domain (HTTP)
     "https://nyamtull.github.io",      # Your GitHub Pages URL
     "https://nyamtull.github.io/KDSC_COLAPP", # Your specific project URL
-    "https://strike-belle-offered-header.trycloudflare.com", # Cloudflare Tunnel
     "http://localhost:3000",           # For local development
     "http://localhost:8080",           # For local development
     "http://127.0.0.1:3000",          # For local development
