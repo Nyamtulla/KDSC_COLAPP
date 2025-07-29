@@ -28014,7 +28014,7 @@ a0y(a){return A.aN7(a)},
 aN7(a){var s=0,r=A.M(t.a),q,p=2,o=[],n,m,l,k,j,i,h
 var $async$a0y=A.I(function(b,c){if(b===1){o.push(c)
 s=p}while(true)switch(s){case 0:p=4
-k=A.e5("http://api.nyamshaik.me/register",0,null)
+k=A.e5("https://api.nyamshaik.me/register",0,null)
 j=A.t3()
 s=7
 return A.N(A.aBX(k,B.ab.iN(a),j),$async$a0y)
@@ -28049,7 +28049,7 @@ a0x(a,b){return A.aN6(a,b)},
 aN6(a,b){var s=0,r=A.M(t.a),q,p=2,o=[],n,m,l,k,j,i,h,g,f
 var $async$a0x=A.I(function(c,d){if(c===1){o.push(d)
 s=p}while(true)switch(s){case 0:p=4
-j=A.e5("http://api.nyamshaik.me/login",0,null)
+j=A.e5("https://api.nyamshaik.me/login",0,null)
 i=A.t3()
 h=t.N
 s=7
@@ -28090,7 +28090,7 @@ aN9(a,a0,a1,a2,a3){var s=0,r=A.M(t.a),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d,c,b
 var $async$Jv=A.I(function(a4,a5){if(a4===1){o.push(a5)
 s=p}while(true)switch(s){case 0:c="auto"
 p=4
-n=A.aQJ("POST",A.e5("http://api.nyamshaik.me/upload-receipt",0,null))
+n=A.aQJ("POST",A.e5("https://api.nyamshaik.me/upload-receipt",0,null))
 h=$.a0s
 if(h!=null)n.r.m(0,"Authorization","Bearer "+h)
 n.x.m(0,"store_name",a1)
@@ -28143,7 +28143,7 @@ a0v(){var s=0,r=A.M(t.a),q,p=2,o=[],n,m,l,k,j,i,h
 var $async$a0v=A.I(function(a,b){if(a===1){o.push(b)
 s=p}while(true)switch(s){case 0:p=4
 s=7
-return A.N(A.aBN(A.e5("http://api.nyamshaik.me/receipts",0,null),A.t3()),$async$a0v)
+return A.N(A.aBN(A.e5("https://api.nyamshaik.me/receipts",0,null),A.t3()),$async$a0v)
 case 7:n=b
 if(n.b===200){j=n
 m=B.ab.bD(A.hY(A.hW(j.e)).bD(j.w))
@@ -28177,7 +28177,7 @@ a0z(a,b){return A.aN8(a,b)},
 aN8(a,b){var s=0,r=A.M(t.a),q,p=2,o=[],n,m,l,k,j,i,h
 var $async$a0z=A.I(function(c,d){if(c===1){o.push(d)
 s=p}while(true)switch(s){case 0:p=4
-k=A.e5("http://api.nyamshaik.me/receipt/"+a,0,null)
+k=A.e5("https://api.nyamshaik.me/receipt/"+a,0,null)
 j=A.t3()
 s=7
 return A.N(A.aZ5(k,B.ab.iN(b),j),$async$a0z)
@@ -28212,7 +28212,7 @@ a0u(){var s=0,r=A.M(t.a),q,p=2,o=[],n,m,l,k,j,i,h
 var $async$a0u=A.I(function(a,b){if(a===1){o.push(b)
 s=p}while(true)switch(s){case 0:p=4
 s=7
-return A.N(A.aBN(A.e5("http://api.nyamshaik.me/dashboard-stats",0,null),A.t3()),$async$a0u)
+return A.N(A.aBN(A.e5("https://api.nyamshaik.me/dashboard-stats",0,null),A.t3()),$async$a0u)
 case 7:n=b
 if(n.b===200){j=n
 m=B.ab.bD(A.hY(A.hW(j.e)).bD(j.w))
@@ -28246,7 +28246,7 @@ a0w(){var s=0,r=A.M(t.a),q,p=2,o=[],n,m,l,k,j,i,h
 var $async$a0w=A.I(function(a,b){if(a===1){o.push(b)
 s=p}while(true)switch(s){case 0:p=4
 s=7
-return A.N(A.aBN(A.e5("http://api.nyamshaik.me/receipts/unreviewed",0,null),A.t3()),$async$a0w)
+return A.N(A.aBN(A.e5("https://api.nyamshaik.me/receipts/unreviewed",0,null),A.t3()),$async$a0w)
 case 7:n=b
 if(n.b===200){j=n
 m=B.ab.bD(A.hY(A.hW(j.e)).bD(j.w))
@@ -28280,7 +28280,7 @@ a0t(a){return A.aN5(a)},
 aN5(a){var s=0,r=A.M(t.a),q,p=2,o=[],n,m,l,k,j,i,h,g
 var $async$a0t=A.I(function(b,c){if(b===1){o.push(c)
 s=p}while(true)switch(s){case 0:p=4
-j=A.e5("http://api.nyamshaik.me/expense/manual",0,null)
+j=A.e5("https://api.nyamshaik.me/expense/manual",0,null)
 i=A.t3()
 s=7
 return A.N(A.aBX(j,B.ab.iN(a),i),$async$a0t)
