@@ -30,6 +30,7 @@ class EnhancedReceiptParser:
             logger.info("✓ Offline LLM service initialized")
         except Exception as e:
             logger.warning(f"Failed to initialize LLM service: {e}")
+            logger.info("⚠️  Falling back to OCR-only parsing (no LLM)")
             self.llm_service = None # Ensure it's None if initialization fails
     
     def parse_receipt(self, file_path: str, method: str = 'auto') -> Dict[str, Any]:
@@ -66,24 +67,43 @@ class EnhancedReceiptParser:
             }
     
     def _parse_with_llm(self, file_path: str) -> Dict[str, Any]:
-        """Parse receipt using offline LLM (image → OCR → LLM)"""
+        """Parse receipt using offline LLM (image → OCR → LLM) or fallback to OCR-only"""
         norm_path = os.path.normpath(file_path)
         try:
             if not self.llm_service:
-                return {
-                    'success': False,
-                    'error': 'LLM service not available',
-                    'method': 'llm',
-                    'data': self._get_fallback_data()
-                }
+                logger.info("LLM not available, using OCR-only parsing")
+                return self._parse_with_ocr_only(norm_path)
+            
             result = self.llm_service.parse_receipt_image(norm_path)
             return result
         except Exception as e:
             logger.error(f"LLM parsing failed: {e}")
+            logger.info("Falling back to OCR-only parsing")
+            return self._parse_with_ocr_only(norm_path)
+    
+    def _parse_with_ocr_only(self, file_path: str) -> Dict[str, Any]:
+        """Parse receipt using OCR-only with heuristic rules"""
+        try:
+            from ocr_service import OCRService
+            ocr_service = OCRService()
+            
+            # Extract text using OCR
+            ocr_text = ocr_service.extract_text(file_path)
+            
+            # Apply heuristic parsing
+            result = self._apply_heuristic_parsing(ocr_text)
+            
+            return {
+                'success': True,
+                'method': 'ocr_only',
+                'data': result
+            }
+        except Exception as e:
+            logger.error(f"OCR-only parsing failed: {e}")
             return {
                 'success': False,
                 'error': str(e),
-                'method': 'llm',
+                'method': 'ocr_only',
                 'data': self._get_fallback_data()
             }
     

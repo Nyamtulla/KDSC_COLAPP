@@ -4,10 +4,10 @@
     "tesseract_config": "--oem 3 --psm 6"
   },
   "llm": {
-    "model": "llama2:7b",
-    "host": "http://host.docker.internal:11434",
+    "model": "qwen2.5:0.5b",
+    "host": "http://colapp-ollama:11434",
     "temperature": 0.1,
-    "max_tokens": 2048
+    "max_tokens": 512
   },
   "custom_nlp": {
     "enabled": true,

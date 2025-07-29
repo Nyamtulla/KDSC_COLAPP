@@ -211,8 +211,8 @@ def download_llm_model():
         print("   ollama serve")
         return False
     
-    # Download Llama 2 7B model
-    model_name = "llama2:7b"
+    # Download Qwen 2.5 0.5B model
+    model_name = "qwen2.5:0.5b"
     print(f"📥 Downloading {model_name}...")
     
     try:
@@ -281,10 +281,10 @@ def create_config_file():
             "tesseract_config": "--oem 3 --psm 6"
         },
         "llm": {
-            "model": "llama2:7b",
+            "model": "qwen2.5:0.5b",
             "host": "http://localhost:11434",
             "temperature": 0.1,
-            "max_tokens": 2048
+            "max_tokens": 512
         },
         "custom_nlp": {
             "enabled": True,

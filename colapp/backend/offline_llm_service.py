@@ -41,12 +41,12 @@ class ReceiptData(BaseModel):
 class OfflineLLMService:
     """Service for offline LLM-based receipt parsing using Ollama"""
     
-    def __init__(self, model_name: str = "llama2:7b", host: str = "http://host.docker.internal:11434"):
+    def __init__(self, model_name: str = "qwen2.5:0.5b", host: str = "http://colapp-ollama:11434"):
         """
         Initialize the offline LLM service
         
         Args:
-            model_name: Ollama model to use (llama2:7b, mistral:7b, etc.)
+            model_name: Ollama model to use (qwen2.5:0.5b, llama2:7b, mistral:7b, etc.)
             host: Ollama server host
         """
         self.model_name = model_name
@@ -67,7 +67,7 @@ class OfflineLLMService:
             
             if self.model_name not in available_models:
                 logger.warning(f"Model {self.model_name} not found. Available models: {available_models}")
-                logger.info("You can pull the model using: ollama pull llama2:7b")
+                logger.info("You can pull the model using: ollama pull qwen2.5:0.5b")
                 # Try to use the first available model
                 if available_models:
                     self.model_name = available_models[0]
