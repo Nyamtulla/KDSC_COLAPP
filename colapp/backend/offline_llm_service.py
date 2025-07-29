@@ -82,36 +82,38 @@ class OfflineLLMService:
         """Get the system prompt for receipt parsing"""
         return """You are an expert receipt parser. Your task is to extract structured information from receipt text and return it as valid JSON.
 
-IMPORTANT RULES:
-1. Always return valid JSON that matches the ReceiptData schema
-2. Extract store name from the header/top of receipt
-3. Parse each line that contains product information into items
-4. Identify quantities, unit prices, and total prices for each item
-5. Extract subtotal, tax, and total amounts
-6. Look for date/time information
-7. Handle missing information gracefully (use null for missing fields)
-8. Ensure all monetary values are numeric (no currency symbols)
-9. Categorize items when possible (Dairy, Produce, Meat, etc.)
+CRITICAL RULES:
+1. ALWAYS return valid, complete JSON that matches the ReceiptData schema
+2. NEVER leave JSON incomplete or with unclosed brackets/braces
+3. ALWAYS quote all string values and keys
+4. Use null for missing fields, not undefined or empty strings
+5. Ensure all monetary values are numbers (no currency symbols)
+6. Extract store name from the header/top of receipt
+7. Parse each line that contains product information into items
+8. Identify quantities, unit prices, and total prices for each item
+9. Extract subtotal, tax, and total amounts
+10. Look for date/time information
+11. Categorize items when possible (Dairy, Produce, Meat, etc.)
 
 ReceiptData Schema:
 {
   "store_name": "string",
-  "date": "string (YYYY-MM-DD format)",
-  "time": "string (HH:MM format)",
+  "date": "string (YYYY-MM-DD format) or null",
+  "time": "string (HH:MM format) or null",
   "items": [
     {
       "name": "string",
-      "quantity": "number",
-      "unit_price": "number",
-      "total_price": "number",
-      "category": "string (optional)"
+      "quantity": number,
+      "unit_price": number,
+      "total_price": number,
+      "category": "string or null"
     }
   ],
-  "subtotal": "number (optional)",
-  "tax": "number (optional)",
-  "total": "number",
-  "change": "number (optional)",
-  "payment_method": "string (optional)"
+  "subtotal": number or null,
+  "tax": number or null,
+  "total": number,
+  "change": number or null,
+  "payment_method": "string or null"
 }
 
 Example output:
@@ -133,7 +135,9 @@ Example output:
   "total": 17.25,
   "change": 2.75,
   "payment_method": "CASH"
-}"""
+}
+
+IMPORTANT: Return ONLY the JSON object, no additional text, explanations, or markdown formatting."""
     
     def parse_receipt_text(self, text: str) -> Dict[str, Any]:
         """
@@ -258,21 +262,69 @@ Return only the JSON object, no additional text or explanations."""
         return '\n'.join(lines)
     
     def _extract_json_from_response(self, response: str) -> str:
-        """Extract JSON from LLM response"""
-        # Try to find JSON in the response
-        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        """Extract JSON from LLM response with better error handling"""
+        try:
+            # Try to find JSON in the response
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            
+            if json_match:
+                json_str = json_match.group(0)
+                # Try to parse it to validate
+                json.loads(json_str)
+                return json_str
+            
+            # If no valid JSON found, try to clean up the response
+            cleaned = response.strip()
+            if cleaned.startswith('```json'):
+                cleaned = cleaned[7:]
+            if cleaned.endswith('```'):
+                cleaned = cleaned[:-3]
+            
+            # Try to fix common JSON issues
+            cleaned = self._fix_common_json_issues(cleaned)
+            
+            # Validate the cleaned JSON
+            json.loads(cleaned)
+            return cleaned.strip()
+            
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON parsing failed: {e}")
+            # Return a minimal valid JSON as fallback
+            return self._get_minimal_json_fallback()
+    
+    def _fix_common_json_issues(self, json_str: str) -> str:
+        """Fix common JSON formatting issues from LLM responses"""
+        # Remove trailing commas
+        json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
         
-        if json_match:
-            return json_match.group(0)
+        # Fix unquoted keys
+        json_str = re.sub(r'(\w+):', r'"\1":', json_str)
         
-        # If no JSON found, try to clean up the response
-        cleaned = response.strip()
-        if cleaned.startswith('```json'):
-            cleaned = cleaned[7:]
-        if cleaned.endswith('```'):
-            cleaned = cleaned[:-3]
+        # Fix unquoted string values
+        json_str = re.sub(r':\s*([^"\d\[\]{},]+)(?=\s*[,}\]])', r': "\1"', json_str)
         
-        return cleaned.strip()
+        # Fix missing quotes around string values
+        json_str = re.sub(r':\s*"([^"]*)"([^"]*)"', r': "\1\2"', json_str)
+        
+        # Ensure the JSON is properly closed
+        if json_str.count('{') > json_str.count('}'):
+            json_str += '}'
+        
+        return json_str
+    
+    def _get_minimal_json_fallback(self) -> str:
+        """Return a minimal valid JSON when parsing fails"""
+        return '''{
+            "store_name": "Unknown Store",
+            "date": null,
+            "time": null,
+            "items": [],
+            "subtotal": null,
+            "tax": null,
+            "total": 0.0,
+            "change": null,
+            "payment_method": null
+        }'''
     
     def _validate_and_clean_data(self, data: Dict) -> Dict:
         """Validate and clean parsed data"""
