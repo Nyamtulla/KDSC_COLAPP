@@ -80,64 +80,39 @@ class OfflineLLMService:
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for receipt parsing"""
-        return """You are an expert receipt parser. Your task is to extract structured information from receipt text and return it as valid JSON.
+        return """You are an expert receipt parser. Parse the receipt text and return ONLY valid JSON.
 
 CRITICAL RULES:
-1. ALWAYS return valid, complete JSON that matches the ReceiptData schema
-2. NEVER leave JSON incomplete or with unclosed brackets/braces
-3. ALWAYS quote all string values and keys
-4. Use null for missing fields, not undefined or empty strings
-5. Ensure all monetary values are numbers (no currency symbols)
-6. Extract store name from the header/top of receipt
-7. Parse each line that contains product information into items
-8. Identify quantities, unit prices, and total prices for each item
-9. Extract subtotal, tax, and total amounts
-10. Look for date/time information
-11. Categorize items when possible (Dairy, Produce, Meat, etc.)
+1. Parse the ACTUAL receipt text provided, do NOT return example data
+2. Extract real store name, items, prices from the receipt
+3. Return valid JSON with proper quotes and structure
+4. Use null for missing fields
+5. Convert all prices to numbers (remove $ symbols)
+6. Look for patterns like "PRODUCT_NAME PRICE" or "PRODUCT_NAME QUANTITY PRICE"
+7. Categorize items: Dairy, Produce, Meat, Frozen Foods, Canned Goods, Beverages, Snacks, Household, Personal Care, Other
 
-ReceiptData Schema:
+JSON Structure:
 {
-  "store_name": "string",
-  "date": "string (YYYY-MM-DD format) or null",
-  "time": "string (HH:MM format) or null",
+  "store_name": "actual store name",
+  "date": "date from receipt or null",
+  "time": "time from receipt or null",
   "items": [
     {
-      "name": "string",
-      "quantity": number,
-      "unit_price": number,
-      "total_price": number,
-      "category": "string or null"
+      "name": "actual product name",
+      "quantity": actual_quantity,
+      "unit_price": actual_unit_price,
+      "total_price": actual_total_price,
+      "category": "appropriate category"
     }
   ],
-  "subtotal": number or null,
-  "tax": number or null,
-  "total": number,
-  "change": number or null,
-  "payment_method": "string or null"
+  "subtotal": actual_subtotal_or_null,
+  "tax": actual_tax_or_null,
+  "total": actual_total,
+  "change": actual_change_or_null,
+  "payment_method": "actual_payment_method_or_null"
 }
 
-Example output:
-{
-  "store_name": "Walmart Supercenter",
-  "date": "2024-01-15",
-  "time": "14:30",
-  "items": [
-    {
-      "name": "Milk 2% 1 Gallon",
-      "quantity": 1,
-      "unit_price": 3.99,
-      "total_price": 3.99,
-      "category": "Dairy"
-    }
-  ],
-  "subtotal": 15.97,
-  "tax": 1.28,
-  "total": 17.25,
-  "change": 2.75,
-  "payment_method": "CASH"
-}
-
-IMPORTANT: Return ONLY the JSON object, no additional text, explanations, or markdown formatting."""
+IMPORTANT: Parse the REAL receipt data, not example data."""
     
     def parse_receipt_text(self, text: str) -> Dict[str, Any]:
         """
@@ -155,46 +130,45 @@ IMPORTANT: Return ONLY the JSON object, no additional text, explanations, or mar
             print("LLM parsed raw OCR text:", cleaned_text)
             
             # Create the prompt
-            prompt = f"""Parse this receipt text and return ONLY valid JSON:
+            prompt = f"""Parse this ACTUAL receipt text and return ONLY valid JSON:
 
 {cleaned_text}
 
 INSTRUCTIONS:
-1. Look at EACH line that contains a product name and price
-2. Lines with numbers that look like prices (e.g., 0.97, 9.98, 3.24) are likely items
-3. Extract ALL items you can find, not just the first few
+1. Parse the REAL receipt data above, do NOT return example data
+2. Look for lines with product names followed by prices
+3. Extract ALL items you can find (look for around 11 items)
 4. Look for patterns like: "PRODUCT_NAME PRICE" or "PRODUCT_NAME QUANTITY PRICE"
-5. The receipt shows "ITEMS SOLD 11" so there should be around 11 items
+5. Extract real store name, total amount, tax, payment method
 
-Return ONLY a JSON object with this exact structure (no other text):
+Return ONLY a JSON object with the ACTUAL data from this receipt (no other text):
 {{
-  "store_name": "store name here",
-  "date": "date if found or null",
-  "time": "time if found or null", 
+  "store_name": "actual store name from receipt",
+  "date": "actual date from receipt or null",
+  "time": "actual time from receipt or null", 
   "items": [
     {{
-      "name": "item name",
-      "quantity": quantity_number,
-      "unit_price": price_number,
-      "total_price": total_number,
-      "category": "category from: {', '.join(ALLOWED_CATEGORIES)}"
+      "name": "actual product name from receipt",
+      "quantity": actual_quantity_from_receipt,
+      "unit_price": actual_unit_price_from_receipt,
+      "total_price": actual_total_price_from_receipt,
+      "category": "appropriate category from: {', '.join(ALLOWED_CATEGORIES)}"
     }}
   ],
-  "subtotal": subtotal_number_or_null,
-  "tax": tax_number_or_null,
-  "total": total_number,
-  "change": change_number_or_null,
-  "payment_method": "payment_method_or_null"
+  "subtotal": actual_subtotal_from_receipt_or_null,
+  "tax": actual_tax_from_receipt_or_null,
+  "total": actual_total_from_receipt,
+  "change": actual_change_from_receipt_or_null,
+  "payment_method": "actual_payment_method_from_receipt_or_null"
 }}
 
-IMPORTANT: Return ONLY the JSON object, no explanations, no markdown, no additional text."""
+IMPORTANT: Parse the REAL receipt data above, not example data."""
 
             # Get response from Ollama
             response = self.client.chat(
                 model=self.model_name,
                 messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": f"{self.system_prompt}\n\n{prompt}"}
                 ],
                 options={
                     "temperature": 0.1,  # Low temperature for consistent output
