@@ -217,7 +217,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             ),
             SizedBox(height: 12),
             
-            // Category
+                        // Category
             if (_categoriesLoaded)
               HierarchicalCategoryPicker(
                 selectedCategory: item['category'],
@@ -225,9 +225,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 onCategorySelected: (category) => _updateItem(index, 'category', category),
               )
             else
-              Container(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Category',
+                  border: OutlineInputBorder(),
+                  hintText: 'Enter category manually',
+                ),
+                onChanged: (value) => _updateItem(index, 'category', value),
               ),
             SizedBox(height: 12),
             

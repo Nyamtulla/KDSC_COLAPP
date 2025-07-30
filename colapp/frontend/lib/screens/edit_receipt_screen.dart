@@ -235,15 +235,19 @@ class _EditReceiptScreenState extends State<EditReceiptScreen> {
                           Row(
                             children: [
                               Expanded(
-                                child: _categoriesLoaded
+                                                                child: _categoriesLoaded
                                     ? HierarchicalCategoryPicker(
                                         selectedCategory: items[i].category,
                                         categoryHierarchy: _categoryHierarchy,
                                         onCategorySelected: (category) => setState(() => items[i].category = category),
                                       )
-                                    : Container(
-                                        padding: EdgeInsets.all(16),
-                                        child: Center(child: CircularProgressIndicator()),
+                                    : TextFormField(
+                                        initialValue: items[i].category,
+                                        decoration: InputDecoration(
+                                          labelText: "Category",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (v) => items[i].category = v,
                                       ),
                               ),
                               SizedBox(width: 12),
