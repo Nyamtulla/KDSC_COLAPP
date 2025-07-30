@@ -80,39 +80,39 @@ class OfflineLLMService:
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for receipt parsing"""
-        return """You are an expert receipt parser. Parse the receipt text and return ONLY valid JSON.
+        return """You are an expert receipt parser. Focus on identifying ALL products from receipt text.
 
 CRITICAL RULES:
-1. Parse the ACTUAL receipt text provided, do NOT return example data
-2. Extract real store name, items, prices from the receipt
+1. Your main goal is to find ALL product names from the receipt
+2. Extract as many products as possible, even if you can't get prices or quantities
 3. Return valid JSON with proper quotes and structure
-4. Use null for missing fields
-5. Convert all prices to numbers (remove $ symbols)
-6. Look for patterns like "PRODUCT_NAME PRICE" or "PRODUCT_NAME QUANTITY PRICE"
-7. Categorize items: Dairy, Produce, Meat, Frozen Foods, Canned Goods, Beverages, Snacks, Household, Personal Care, Other
+4. Use 0.0 for missing prices, 1.0 for missing quantities, "Other" for missing categories
+5. Use null for missing fields like date, time, payment method
+6. Convert all prices to numbers (remove $ symbols)
+7. Categorize items when obvious: Dairy, Produce, Meat, Frozen Foods, Canned Goods, Beverages, Snacks, Household, Personal Care, Other
 
 JSON Structure:
 {
-  "store_name": "actual store name",
-  "date": "date from receipt or null",
-  "time": "time from receipt or null",
+  "store_name": "store name if found or null",
+  "date": "date if found or null",
+  "time": "time if found or null",
   "items": [
     {
-      "name": "actual product name",
-      "quantity": actual_quantity,
-      "unit_price": actual_unit_price,
-      "total_price": actual_total_price,
-      "category": "appropriate category"
+      "name": "product name you can identify",
+      "quantity": quantity if found or 1.0,
+      "unit_price": price if found or 0.0,
+      "total_price": total if found or 0.0,
+      "category": "category if obvious or Other"
     }
   ],
-  "subtotal": actual_subtotal_or_null,
-  "tax": actual_tax_or_null,
-  "total": actual_total,
-  "change": actual_change_or_null,
-  "payment_method": "actual_payment_method_or_null"
+  "subtotal": subtotal if found or null,
+  "tax": tax if found or null,
+  "total": total if found or null,
+  "change": change if found or null,
+  "payment_method": "payment method if found or null"
 }
 
-IMPORTANT: Parse the REAL receipt data, not example data."""
+IMPORTANT: Focus on finding ALL products, even if other information is missing."""
     
     def parse_receipt_text(self, text: str) -> Dict[str, Any]:
         """
@@ -130,39 +130,41 @@ IMPORTANT: Parse the REAL receipt data, not example data."""
             print("LLM parsed raw OCR text:", cleaned_text)
             
             # Create the prompt
-            prompt = f"""Parse this ACTUAL receipt text and return ONLY valid JSON:
+            prompt = f"""Parse this receipt text and extract ALL products you can identify:
 
 {cleaned_text}
 
 INSTRUCTIONS:
-1. Parse the REAL receipt data above, do NOT return example data
-2. Look for lines with product names followed by prices
-3. Extract ALL items you can find (look for around 11 items)
-4. Look for patterns like: "PRODUCT_NAME PRICE" or "PRODUCT_NAME QUANTITY PRICE"
-5. Extract real store name, total amount, tax, payment method
+1. Focus on finding ALL product names from the receipt
+2. Look for any line that might contain a product name
+3. Extract as many products as you can see, even if you can't get prices or quantities
+4. If you can't determine a price, use 0.0
+5. If you can't determine quantity, use 1.0
+6. If you can't determine category, use "Other"
+7. The receipt shows "ITEMS SOLD 11" - try to find all 11 items
 
-Return ONLY a JSON object with the ACTUAL data from this receipt (no other text):
+Return ONLY a JSON object with ALL products found:
 {{
-  "store_name": "actual store name from receipt",
-  "date": "actual date from receipt or null",
-  "time": "actual time from receipt or null", 
+  "store_name": "store name if found or null",
+  "date": "date if found or null",
+  "time": "time if found or null", 
   "items": [
     {{
-      "name": "actual product name from receipt",
-      "quantity": actual_quantity_from_receipt,
-      "unit_price": actual_unit_price_from_receipt,
-      "total_price": actual_total_price_from_receipt,
-      "category": "appropriate category from: {', '.join(ALLOWED_CATEGORIES)}"
+      "name": "product name you can identify",
+      "quantity": quantity if found or 1.0,
+      "unit_price": price if found or 0.0,
+      "total_price": total if found or 0.0,
+      "category": "category if obvious or Other"
     }}
   ],
-  "subtotal": actual_subtotal_from_receipt_or_null,
-  "tax": actual_tax_from_receipt_or_null,
-  "total": actual_total_from_receipt,
-  "change": actual_change_from_receipt_or_null,
-  "payment_method": "actual_payment_method_from_receipt_or_null"
+  "subtotal": subtotal if found or null,
+  "tax": tax if found or null,
+  "total": total if found or null,
+  "change": change if found or null,
+  "payment_method": "payment method if found or null"
 }}
 
-IMPORTANT: Parse the REAL receipt data above, not example data."""
+IMPORTANT: Focus on finding ALL products, even if other information is missing."""
 
             # Get response from Ollama
             response = self.client.chat(
