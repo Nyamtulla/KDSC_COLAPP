@@ -5,6 +5,7 @@ import 'review_receipts_screen.dart';
 import 'edit_receipt_screen.dart';
 import '../services/api_service.dart';
 import '../widgets/hierarchical_category_picker.dart';
+import '../utils/categories.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 final primaryBlue = Color(0xFF0051BA);
@@ -39,18 +40,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     _loadCategories();
   }
 
-  Future<void> _loadCategories() async {
-    try {
-      final result = await ApiService.getBLSCategoryHierarchy();
-      if (result['success']) {
-        setState(() {
-          _categoryHierarchy = result['hierarchy'];
-          _categoriesLoaded = true;
-        });
-      }
-    } catch (e) {
-      print('Error loading categories: $e');
-    }
+  void _loadCategories() {
+    // Use static BLS CPI categories - no API needed
+    setState(() {
+      _categoryHierarchy = BLSCategories.getHierarchy();
+      _categoriesLoaded = true;
+    });
   }
 
   @override

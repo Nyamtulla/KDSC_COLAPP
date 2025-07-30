@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../widgets/hierarchical_category_picker.dart';
+import '../utils/categories.dart';
 
 // Import theme colors from main.dart
 final primaryBlue = Color(0xFF0051BA);
@@ -84,18 +85,12 @@ class _EditReceiptScreenState extends State<EditReceiptScreen> {
     _loadCategories();
   }
 
-  Future<void> _loadCategories() async {
-    try {
-      final result = await ApiService.getBLSCategoryHierarchy();
-      if (result['success']) {
-        setState(() {
-          _categoryHierarchy = result['hierarchy'];
-          _categoriesLoaded = true;
-        });
-      }
-    } catch (e) {
-      print('Error loading categories: $e');
-    }
+  void _loadCategories() {
+    // Use static BLS CPI categories - no API needed
+    setState(() {
+      _categoryHierarchy = BLSCategories.getHierarchy();
+      _categoriesLoaded = true;
+    });
   }
 
   Future<void> saveAndReturn() async {

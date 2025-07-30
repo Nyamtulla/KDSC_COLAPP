@@ -180,7 +180,13 @@ class OfflineLLMService:
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for receipt parsing"""
-        return """You are an expert receipt parser. Focus on identifying ALL products from receipt text.
+        from bls_categories import get_all_categories
+        
+        # Get all categories as a formatted string
+        categories = get_all_categories()
+        categories_text = "\n".join([f"   - {cat}" for cat in categories])
+        
+        return f"""You are an expert receipt parser. Focus on identifying ALL products from receipt text.
 
 CRITICAL RULES:
 1. Your main goal is to find ALL product names from the receipt
@@ -189,45 +195,29 @@ CRITICAL RULES:
 4. Use 0.0 for missing prices, 1.0 for missing quantities
 5. Use null for missing fields like date, time, payment method
 6. Convert all prices to numbers (remove $ symbols)
-7. Categorize items using BLS Consumer Price Index categories:
-   - Food and Beverages > Food at home > [Cereals and bakery products, Meats poultry fish and eggs, Dairy and related products, Fruits and vegetables, Nonalcoholic beverages and beverage materials, Other food at home]
-   - Food and Beverages > Food away from home > [Full service meals and snacks, Limited service meals and snacks, Food at employee sites and schools, Food at elementary and secondary schools, Food from vending machines and mobile vendors, Other food away from home]
-   - Food and Beverages > Alcoholic beverages > [Beer ale and other malt beverages at home, Beer ale and other malt beverages away from home, Wine at home, Wine away from home, Distilled spirits at home, Distilled spirits away from home]
-   - Housing > Shelter > [Rent of primary residence, Lodging away from home, Owners equivalent rent of residences, Tenants and household insurance]
-   - Housing > Fuels and utilities > [Fuel oil and other fuels, Gas piped and electricity, Water and sewer and trash collection services]
-   - Housing > Household furnishings and operations > [Window and floor coverings and other linens, Furniture and bedding, Appliances, Tools hardware outdoor equipment and supplies, Housekeeping supplies, Household cleaning products, Paper and plastic products, Miscellaneous household products, Household operations]
-   - Apparel > [Mens and boys apparel, Womens and girls apparel, Infants and toddlers apparel, Footwear, Jewelry and watches]
-   - Transportation > Private transportation > [New and used motor vehicles, Motor fuel, Motor vehicle parts and equipment, Motor vehicle maintenance and repair, Motor vehicle insurance, Motor vehicle fees]
-   - Transportation > Public transportation > [Airline fare, Other intercity transportation, Intracity transportation]
-   - Medical Care > Medical care commodities > [Medicinal drugs, Medical equipment and supplies]
-   - Medical Care > Medical care services > [Professional services, Hospital and related services, Health insurance]
-   - Recreation > [Video and audio, Pets pet products and services, Sporting goods, Photography, Other recreational goods, Recreation services]
-   - Education and Communication > Education > [Educational books and supplies, Tuition other school fees and childcare, College tuition and fees, Elementary and high school tuition and fees, Child care and nursery school, Technical and business school tuition and fees]
-   - Education and Communication > Communication > [Postage and delivery services, Telephone services, Information technology hardware and services]
-   - Other Goods and Services > Tobacco and smoking products > [Cigarettes, Other tobacco products and smoking accessories]
-   - Other Goods and Services > Personal care > [Hair dental shaving and miscellaneous personal care products, Cosmetics perfume bath nail preparations and implements, Personal care services]
-   - Other Goods and Services > Miscellaneous personal services > [Legal services, Funeral expenses, Laundry and dry cleaning services, Apparel services other than laundry and dry cleaning, Financial services, Checking account and other bank services, Tax return preparation and other accounting fees, Miscellaneous personal services]
+7. Categorize items using these exact BLS Consumer Price Index categories:
+{categories_text}
 
 JSON Structure:
-{
+{{
   "store_name": "store name if found or null",
   "date": "date if found or null",
   "time": "time if found or null",
   "items": [
-    {
+    {{
       "name": "product name you can identify",
       "quantity": quantity if found or 1.0,
       "unit_price": price if found or 0.0,
       "total_price": total if found or 0.0,
       "category": "BLS category path (e.g., 'Food and Beverages > Food at home > Dairy and related products')"
-    }
+    }}
   ],
   "subtotal": subtotal if found or null,
   "tax": tax if found or null,
   "total": total if found or null,
   "change": change if found or null,
   "payment_method": "payment method if found or null"
-}
+}}
 
 IMPORTANT: Focus on finding ALL products and use the exact BLS category paths listed above."""
     
