@@ -8,7 +8,9 @@ class ApiService {
   // Use different URLs for web vs mobile
   static String get baseUrl {
     if (kIsWeb) {
-      return 'https://api.nyamshaik.me'; // For web (HTTPS)
+      // Production URL - update this with your actual production API URL
+      return 'https://api.nyamshaik.me'; // For production (HTTPS)
+      // return 'http://localhost:5000'; // For local testing (HTTP)
     } else {
       // For Android emulator, use 10.0.2.2 to access host machine
       return 'http://10.0.2.2:5000';
@@ -331,6 +333,46 @@ class ApiService {
       } else {
         final error = json.decode(response.body);
         return {'success': false, 'error': error['error'] ?? 'Failed to save receipt image'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
+
+  // Get BLS categories
+  static Future<Map<String, dynamic>> getBLSCategories() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/categories'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {'success': true, 'categories': data['categories']};
+      } else {
+        final error = json.decode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Failed to fetch categories'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
+
+  // Get BLS category hierarchy
+  static Future<Map<String, dynamic>> getBLSCategoryHierarchy() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/categories/hierarchy'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {'success': true, 'hierarchy': data['hierarchy']};
+      } else {
+        final error = json.decode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Failed to fetch category hierarchy'};
       }
     } catch (e) {
       return {'success': false, 'error': 'Network error: $e'};

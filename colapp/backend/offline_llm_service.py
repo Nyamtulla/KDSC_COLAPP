@@ -10,12 +10,112 @@ from pydantic import BaseModel, Field
 import logging
 from ocr_service import OCRService
 
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# BLS categories are now handled by the LLM directly
 ALLOWED_CATEGORIES = [
-    "Dairy", "Bakery", "Produce", "Meat", "Beverages", "Household", "Frozen", "Snacks", "Pantry", "Seafood", "Personal Care", "Health", "Baby", "Pet", "Canned Goods", "Condiments", "Grains", "Pasta", "Cleaning", "Paper Goods", "Other"
+    "Food and Beverages > Food at home > Cereals and bakery products",
+    "Food and Beverages > Food at home > Meats, poultry, fish, and eggs",
+    "Food and Beverages > Food at home > Dairy and related products",
+    "Food and Beverages > Food at home > Fruits and vegetables",
+    "Food and Beverages > Food at home > Nonalcoholic beverages and beverage materials",
+    "Food and Beverages > Food at home > Other food at home",
+    "Food and Beverages > Food away from home > Full service meals and snacks",
+    "Food and Beverages > Food away from home > Limited service meals and snacks",
+    "Food and Beverages > Food away from home > Food at employee sites and schools",
+    "Food and Beverages > Food away from home > Food at elementary and secondary schools",
+    "Food and Beverages > Food away from home > Food from vending machines and mobile vendors",
+    "Food and Beverages > Food away from home > Other food away from home",
+    "Food and Beverages > Alcoholic beverages > Beer, ale, and other malt beverages at home",
+    "Food and Beverages > Alcoholic beverages > Beer, ale, and other malt beverages away from home",
+    "Food and Beverages > Alcoholic beverages > Wine at home",
+    "Food and Beverages > Alcoholic beverages > Wine away from home",
+    "Food and Beverages > Alcoholic beverages > Distilled spirits at home",
+    "Food and Beverages > Alcoholic beverages > Distilled spirits away from home",
+    "Housing > Shelter > Rent of primary residence",
+    "Housing > Shelter > Lodging away from home",
+    "Housing > Shelter > Owners' equivalent rent of residences",
+    "Housing > Shelter > Tenants' and household insurance",
+    "Housing > Fuels and utilities > Fuel oil and other fuels",
+    "Housing > Fuels and utilities > Gas (piped) and electricity",
+    "Housing > Fuels and utilities > Water and sewer and trash collection services",
+    "Housing > Household furnishings and operations > Window and floor coverings and other linens",
+    "Housing > Household furnishings and operations > Furniture and bedding",
+    "Housing > Household furnishings and operations > Appliances",
+    "Housing > Household furnishings and operations > Tools, hardware, outdoor equipment and supplies",
+    "Housing > Household furnishings and operations > Housekeeping supplies",
+    "Housing > Household furnishings and operations > Household cleaning products",
+    "Housing > Household furnishings and operations > Paper and plastic products",
+    "Housing > Household furnishings and operations > Miscellaneous household products",
+    "Housing > Household furnishings and operations > Household operations",
+    "Apparel > Men's and boys' apparel > Men's apparel",
+    "Apparel > Men's and boys' apparel > Boys' apparel",
+    "Apparel > Women's and girls' apparel > Women's apparel",
+    "Apparel > Women's and girls' apparel > Girls' apparel",
+    "Apparel > Infants' and toddlers' apparel > Infants' apparel",
+    "Apparel > Footwear > Men's footwear",
+    "Apparel > Footwear > Women's footwear",
+    "Apparel > Footwear > Boys' and girls' footwear",
+    "Apparel > Jewelry and watches > Jewelry",
+    "Apparel > Jewelry and watches > Watches",
+    "Transportation > Private transportation > New and used motor vehicles",
+    "Transportation > Private transportation > Motor fuel",
+    "Transportation > Private transportation > Motor vehicle parts and equipment",
+    "Transportation > Private transportation > Motor vehicle maintenance and repair",
+    "Transportation > Private transportation > Motor vehicle insurance",
+    "Transportation > Private transportation > Motor vehicle fees",
+    "Transportation > Public transportation > Airline fare",
+    "Transportation > Public transportation > Other intercity transportation",
+    "Transportation > Public transportation > Intracity transportation",
+    "Medical Care > Medical care commodities > Medicinal drugs",
+    "Medical Care > Medical care commodities > Medical equipment and supplies",
+    "Medical Care > Medical care services > Professional services",
+    "Medical Care > Medical care services > Hospital and related services",
+    "Medical Care > Medical care services > Health insurance",
+    "Recreation > Video and audio > Televisions",
+    "Recreation > Video and audio > Other video equipment",
+    "Recreation > Video and audio > Audio equipment",
+    "Recreation > Video and audio > Recorded music and music subscriptions",
+    "Recreation > Video and audio > Video discs and other media, including rental of video and audio",
+    "Recreation > Video and audio > Video subscription services",
+    "Recreation > Pets, pet products and services > Pets and pet products",
+    "Recreation > Pets, pet products and services > Pet services including veterinary",
+    "Recreation > Sporting goods > Sports vehicles including bicycles",
+    "Recreation > Sporting goods > Sports equipment",
+    "Recreation > Photography > Photographic equipment and supplies",
+    "Recreation > Other recreational goods > Toys, games, hobbies and playground equipment",
+    "Recreation > Other recreational goods > Sewing machines, fabric and supplies",
+    "Recreation > Other recreational goods > Music instruments and accessories",
+    "Recreation > Recreation services > Club membership for shopping clubs, fraternal, or other organizations, or participant sports fees",
+    "Recreation > Recreation services > Admissions to movies, theaters, and concerts",
+    "Recreation > Recreation services > Admissions to sporting events",
+    "Recreation > Recreation services > Fees for lessons or instructions",
+    "Education and Communication > Education > Educational books and supplies",
+    "Education and Communication > Education > Tuition, other school fees, and childcare",
+    "Education and Communication > Education > College tuition and fees",
+    "Education and Communication > Education > Elementary and high school tuition and fees",
+    "Education and Communication > Education > Child care and nursery school",
+    "Education and Communication > Education > Technical and business school tuition and fees",
+    "Education and Communication > Communication > Postage and delivery services",
+    "Education and Communication > Communication > Telephone services",
+    "Education and Communication > Communication > Information technology, hardware and services",
+    "Other Goods and Services > Tobacco and smoking products > Cigarettes",
+    "Other Goods and Services > Tobacco and smoking products > Other tobacco products and smoking accessories",
+    "Other Goods and Services > Personal care > Hair, dental, shaving, and miscellaneous personal care products",
+    "Other Goods and Services > Personal care > Cosmetics, perfume, bath, nail preparations and implements",
+    "Other Goods and Services > Personal care > Personal care services",
+    "Other Goods and Services > Miscellaneous personal services > Legal services",
+    "Other Goods and Services > Miscellaneous personal services > Funeral expenses",
+    "Other Goods and Services > Miscellaneous personal services > Laundry and dry cleaning services",
+    "Other Goods and Services > Miscellaneous personal services > Apparel services other than laundry and dry cleaning",
+    "Other Goods and Services > Miscellaneous personal services > Financial services",
+    "Other Goods and Services > Miscellaneous personal services > Checking account and other bank services",
+    "Other Goods and Services > Miscellaneous personal services > Tax return preparation and other accounting fees",
+    "Other Goods and Services > Miscellaneous personal services > Miscellaneous personal services"
 ]
 
 class ReceiptItem(BaseModel):
@@ -86,10 +186,27 @@ CRITICAL RULES:
 1. Your main goal is to find ALL product names from the receipt
 2. Extract as many products as possible, even if you can't get prices or quantities
 3. Return valid JSON with proper quotes and structure
-4. Use 0.0 for missing prices, 1.0 for missing quantities, "Other" for missing categories
+4. Use 0.0 for missing prices, 1.0 for missing quantities
 5. Use null for missing fields like date, time, payment method
 6. Convert all prices to numbers (remove $ symbols)
-7. Categorize items when obvious: Dairy, Produce, Meat, Frozen Foods, Canned Goods, Beverages, Snacks, Household, Personal Care, Other
+7. Categorize items using BLS Consumer Price Index categories:
+   - Food and Beverages > Food at home > [Cereals and bakery products, Meats poultry fish and eggs, Dairy and related products, Fruits and vegetables, Nonalcoholic beverages and beverage materials, Other food at home]
+   - Food and Beverages > Food away from home > [Full service meals and snacks, Limited service meals and snacks, Food at employee sites and schools, Food at elementary and secondary schools, Food from vending machines and mobile vendors, Other food away from home]
+   - Food and Beverages > Alcoholic beverages > [Beer ale and other malt beverages at home, Beer ale and other malt beverages away from home, Wine at home, Wine away from home, Distilled spirits at home, Distilled spirits away from home]
+   - Housing > Shelter > [Rent of primary residence, Lodging away from home, Owners equivalent rent of residences, Tenants and household insurance]
+   - Housing > Fuels and utilities > [Fuel oil and other fuels, Gas piped and electricity, Water and sewer and trash collection services]
+   - Housing > Household furnishings and operations > [Window and floor coverings and other linens, Furniture and bedding, Appliances, Tools hardware outdoor equipment and supplies, Housekeeping supplies, Household cleaning products, Paper and plastic products, Miscellaneous household products, Household operations]
+   - Apparel > [Mens and boys apparel, Womens and girls apparel, Infants and toddlers apparel, Footwear, Jewelry and watches]
+   - Transportation > Private transportation > [New and used motor vehicles, Motor fuel, Motor vehicle parts and equipment, Motor vehicle maintenance and repair, Motor vehicle insurance, Motor vehicle fees]
+   - Transportation > Public transportation > [Airline fare, Other intercity transportation, Intracity transportation]
+   - Medical Care > Medical care commodities > [Medicinal drugs, Medical equipment and supplies]
+   - Medical Care > Medical care services > [Professional services, Hospital and related services, Health insurance]
+   - Recreation > [Video and audio, Pets pet products and services, Sporting goods, Photography, Other recreational goods, Recreation services]
+   - Education and Communication > Education > [Educational books and supplies, Tuition other school fees and childcare, College tuition and fees, Elementary and high school tuition and fees, Child care and nursery school, Technical and business school tuition and fees]
+   - Education and Communication > Communication > [Postage and delivery services, Telephone services, Information technology hardware and services]
+   - Other Goods and Services > Tobacco and smoking products > [Cigarettes, Other tobacco products and smoking accessories]
+   - Other Goods and Services > Personal care > [Hair dental shaving and miscellaneous personal care products, Cosmetics perfume bath nail preparations and implements, Personal care services]
+   - Other Goods and Services > Miscellaneous personal services > [Legal services, Funeral expenses, Laundry and dry cleaning services, Apparel services other than laundry and dry cleaning, Financial services, Checking account and other bank services, Tax return preparation and other accounting fees, Miscellaneous personal services]
 
 JSON Structure:
 {
@@ -102,7 +219,7 @@ JSON Structure:
       "quantity": quantity if found or 1.0,
       "unit_price": price if found or 0.0,
       "total_price": total if found or 0.0,
-      "category": "category if obvious or Other"
+      "category": "BLS category path (e.g., 'Food and Beverages > Food at home > Dairy and related products')"
     }
   ],
   "subtotal": subtotal if found or null,
@@ -112,7 +229,7 @@ JSON Structure:
   "payment_method": "payment method if found or null"
 }
 
-IMPORTANT: Focus on finding ALL products, even if other information is missing."""
+IMPORTANT: Focus on finding ALL products and use the exact BLS category paths listed above."""
     
     def parse_receipt_text(self, text: str) -> Dict[str, Any]:
         """
@@ -140,7 +257,7 @@ INSTRUCTIONS:
 3. Extract as many products as you can see, even if you can't get prices or quantities
 4. If you can't determine a price, use 0.0
 5. If you can't determine quantity, use 1.0
-6. If you can't determine category, use "Other"
+6. Use the exact BLS category paths from the system prompt for categorization
 7. The receipt shows "ITEMS SOLD 11" - try to find all 11 items
 
 Return ONLY a JSON object with ALL products found:
@@ -154,7 +271,7 @@ Return ONLY a JSON object with ALL products found:
       "quantity": quantity if found or 1.0,
       "unit_price": price if found or 0.0,
       "total_price": total if found or 0.0,
-      "category": "category if obvious or Other"
+      "category": "BLS category path (e.g., 'Food and Beverages > Food at home > Dairy and related products')"
     }}
   ],
   "subtotal": subtotal if found or null,
@@ -164,7 +281,7 @@ Return ONLY a JSON object with ALL products found:
   "payment_method": "payment method if found or null"
 }}
 
-IMPORTANT: Focus on finding ALL products, even if other information is missing."""
+IMPORTANT: Focus on finding ALL products and use the exact BLS category paths listed in the system prompt."""
 
             # Get response from Ollama
             response = self.client.chat(
@@ -194,11 +311,35 @@ IMPORTANT: Focus on finding ALL products, even if other information is missing."
             validated_data = self._validate_and_clean_data(parsed_data)
             print("LLM validated_data:", validated_data)
 
-            # Map categories to allowed list
-            def map_category(cat):
-                return cat if cat in ALLOWED_CATEGORIES else "Other"
+            # Clean and filter items
+            cleaned_items = []
             for item in validated_data.get('items', []):
-                item['category'] = map_category(item.get('category', 'Other'))
+                # Skip non-product items
+                item_name = item.get('name', '').upper()
+                if item_name in ['SUBTOTAL', 'TOTAL', 'TAX', 'CHANGE', 'ITEMS SOLD']:
+                    continue
+                
+                # Fix quantity if it's clearly wrong (e.g., 0.97 should be 1.0)
+                quantity = item.get('quantity', 1.0)
+                if quantity < 0.1 or quantity > 100:  # Unreasonable quantities
+                    quantity = 1.0
+                
+                # Use LLM's category classification (trust the LLM's judgment)
+                category = item.get('category', 'Food and Beverages > Food at home > Other food at home')
+                
+                # Validate that the category follows the expected format
+                if not category or ' > ' not in category:
+                    category = 'Food and Beverages > Food at home > Other food at home'
+                
+                cleaned_items.append({
+                    'name': item.get('name', ''),
+                    'quantity': quantity,
+                    'unit_price': item.get('unit_price', 0.0),
+                    'total_price': item.get('total_price', 0.0),
+                    'category': category
+                })
+            
+            validated_data['items'] = cleaned_items
             
             return {
                 'success': True,
@@ -296,7 +437,7 @@ IMPORTANT: Focus on finding ALL products, even if other information is missing."
             # Validate the cleaned JSON
             json.loads(cleaned)
             return cleaned.strip()
-            
+                
         except json.JSONDecodeError as e:
             logger.warning(f"JSON parsing failed: {e}")
             # Return a minimal valid JSON as fallback
@@ -388,6 +529,8 @@ IMPORTANT: Focus on finding ALL products, even if other information is missing."
             'change': None,
             'payment_method': None
         }
+    
+
     
     def get_model_info(self) -> Dict[str, Any]:
         """Get information about the current model"""

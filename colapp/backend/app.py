@@ -39,18 +39,28 @@ except ImportError:
     OFFLINE_PARSING_AVAILABLE = False
     print("Warning: Offline parsing components not available")
 
+# Import BLS categories
+try:
+    from bls_categories import get_category_hierarchy, get_all_categories
+    BLS_CATEGORIES_AVAILABLE = True
+except ImportError:
+    BLS_CATEGORIES_AVAILABLE = False
+    print("Warning: BLS categories not available")
+
 app = Flask(__name__)
 # Configure CORS to allow requests from GitHub Pages and local development
 CORS(app, origins=[
     "https://nyamshaik.me",            # Your custom domain (HTTPS)
-    "http://nyamshaik.me",             # Your custom domain (HTTP)
+    "https://www.nyamshaik.me",        # Your custom domain with www
     "https://nyamtull.github.io",      # Your GitHub Pages URL
     "https://nyamtull.github.io/KDSC_COLAPP", # Your specific project URL
     "http://localhost:3000",           # For local development
+    "http://localhost:3001",           # For local development (Flutter web)
     "http://localhost:8080",           # For local development
     "http://127.0.0.1:3000",          # For local development
+    "http://127.0.0.1:3001",          # For local development (Flutter web)
     "http://127.0.0.1:8080"           # For local development
-])
+], supports_credentials=True, methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # === Configure DB ===
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI', 'postgresql://postgres:colapp@host.docker.internal:5432/grocery_app_db')
@@ -666,6 +676,50 @@ def get_offline_parser_status():
             'available': False,
             'error': str(e)
         })
+
+@app.route('/api/categories', methods=['GET'])
+@jwt_required()
+def get_categories():
+    """Get BLS categories for frontend selection"""
+    try:
+        if not BLS_CATEGORIES_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'error': 'BLS categories not available'
+            }), 500
+        
+        categories = get_all_categories()
+        return jsonify({
+            'success': True,
+            'categories': categories
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/categories/hierarchy', methods=['GET'])
+@jwt_required()
+def get_categories_hierarchy():
+    """Get full BLS category hierarchy"""
+    try:
+        if not BLS_CATEGORIES_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'error': 'BLS categories not available'
+            }), 500
+        
+        hierarchy = get_category_hierarchy()
+        return jsonify({
+            'success': True,
+            'hierarchy': hierarchy
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():

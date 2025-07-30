@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../widgets/hierarchical_category_picker.dart';
 
 // Import theme colors from main.dart
 final primaryBlue = Color(0xFF0051BA);
@@ -44,9 +45,7 @@ class ReceiptItem {
   };
 }
 
-const List<String> categories = [
-  "Dairy", "Bakery", "Produce", "Meat", "Beverages", "Household", "Frozen", "Snacks", "Pantry", "Seafood", "Personal Care", "Health", "Baby", "Pet", "Canned Goods", "Condiments", "Grains", "Pasta", "Cleaning", "Paper Goods", "Other"
-];
+// Categories will be loaded from BLS API
 
 class EditReceiptScreen extends StatefulWidget {
   final int receiptId;
@@ -63,6 +62,8 @@ class _EditReceiptScreenState extends State<EditReceiptScreen> {
   late TextEditingController totalController;
   late List<ReceiptItem> items;
   bool _isSaving = false;
+  Map<String, dynamic> _categoryHierarchy = {};
+  bool _categoriesLoaded = false;
 
   @override
   void initState() {
@@ -78,6 +79,22 @@ class _EditReceiptScreenState extends State<EditReceiptScreen> {
       for (var itemData in widget.initialData['items']) {
         items.add(ReceiptItem.fromJson(itemData));
       }
+    }
+    
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final result = await ApiService.getBLSCategoryHierarchy();
+      if (result['success']) {
+        setState(() {
+          _categoryHierarchy = result['hierarchy'];
+          _categoriesLoaded = true;
+        });
+      }
+    } catch (e) {
+      print('Error loading categories: $e');
     }
   }
 
@@ -218,18 +235,16 @@ class _EditReceiptScreenState extends State<EditReceiptScreen> {
                           Row(
                             children: [
                               Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  value: categories.contains(items[i].category) ? items[i].category : "Other",
-                                  isExpanded: true,
-                                  items: categories
-                                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                                      .toList(),
-                                  onChanged: (v) => setState(() => items[i].category = v ?? "Other"),
-                                  decoration: InputDecoration(
-                                    labelText: "Category",
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
+                                child: _categoriesLoaded
+                                    ? HierarchicalCategoryPicker(
+                                        initialCategory: items[i].category,
+                                        categoryHierarchy: _categoryHierarchy,
+                                        onCategorySelected: (category) => setState(() => items[i].category = category),
+                                      )
+                                    : Container(
+                                        padding: EdgeInsets.all(16),
+                                        child: Center(child: CircularProgressIndicator()),
+                                      ),
                               ),
                               SizedBox(width: 12),
                               Expanded(
@@ -292,7 +307,7 @@ class _EditReceiptScreenState extends State<EditReceiptScreen> {
                     icon: Icon(Icons.add),
                     label: Text("Add Item"),
                     onPressed: () => setState(() => items.add(
-                        ReceiptItem(productName: "", price: 0, category: "Other", quantity: 1, unitPrice: 0, totalPrice: 0))),
+                        ReceiptItem(productName: "", price: 0, category: "Food and Beverages > Food at home > Other food at home", quantity: 1, unitPrice: 0, totalPrice: 0))),
                   ),
                 ),
                 

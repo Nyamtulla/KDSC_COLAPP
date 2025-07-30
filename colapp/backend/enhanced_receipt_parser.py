@@ -88,7 +88,14 @@ class EnhancedReceiptParser:
             ocr_service = OCRService()
             
             # Extract text using OCR
-            ocr_text = ocr_service.extract_text(file_path)
+            ocr_result = ocr_service.extract_text(file_path)
+            
+            # Check if OCR was successful
+            if not ocr_result.get('success', False):
+                raise Exception(f"OCR failed: {ocr_result.get('error', 'Unknown error')}")
+            
+            # Extract the text from the OCR result
+            ocr_text = ocr_result.get('text', '')
             
             # Apply heuristic parsing
             result = self._apply_heuristic_parsing(ocr_text)

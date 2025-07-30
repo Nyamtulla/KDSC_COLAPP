@@ -4,6 +4,7 @@ import 'home_screen.dart';
 import 'review_receipts_screen.dart';
 import 'edit_receipt_screen.dart';
 import '../services/api_service.dart';
+import '../widgets/hierarchical_category_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 final primaryBlue = Color(0xFF0051BA);
@@ -20,6 +21,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final TextEditingController _totalController = TextEditingController();
   List<Map<String, dynamic>> _items = [];
   bool _isSaving = false;
+  Map<String, dynamic> _categoryHierarchy = {};
+  bool _categoriesLoaded = false;
 
   @override
   void initState() {
@@ -28,11 +31,26 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     _items.add({
       'product_name': '',
       'price': 0.0,
-      'category': 'Other',
+      'category': 'Food and Beverages > Food at home > Other food at home',
       'quantity': 1.0,
       'unit_price': 0.0,
       'total_price': 0.0,
     });
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final result = await ApiService.getBLSCategoryHierarchy();
+      if (result['success']) {
+        setState(() {
+          _categoryHierarchy = result['hierarchy'];
+          _categoriesLoaded = true;
+        });
+      }
+    } catch (e) {
+      print('Error loading categories: $e');
+    }
   }
 
   @override
@@ -200,23 +218,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             SizedBox(height: 12),
             
             // Category
-            DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                labelText: 'Category',
-                border: OutlineInputBorder(),
+            if (_categoriesLoaded)
+              HierarchicalCategoryPicker(
+                initialCategory: item['category'],
+                categoryHierarchy: _categoryHierarchy,
+                onCategorySelected: (category) => _updateItem(index, 'category', category),
+              )
+            else
+              Container(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
               ),
-              value: item['category'],
-              items: [
-                'Dairy', 'Bakery', 'Produce', 'Meat', 'Beverages', 
-                'Household', 'Frozen', 'Snacks', 'Pantry', 'Seafood', 
-                'Personal Care', 'Health', 'Baby', 'Pet', 'Canned Goods', 
-                'Condiments', 'Grains', 'Pasta', 'Cleaning', 'Paper Goods', 'Other'
-              ].map((category) => DropdownMenuItem(
-                value: category,
-                child: Text(category),
-              )).toList(),
-              onChanged: (value) => _updateItem(index, 'category', value ?? 'Other'),
-            ),
             SizedBox(height: 12),
             
             // Quantity and Unit Price Row
