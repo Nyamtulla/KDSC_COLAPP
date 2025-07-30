@@ -155,15 +155,39 @@ IMPORTANT: Return ONLY the JSON object, no additional text, explanations, or mar
             print("LLM parsed raw OCR text:", cleaned_text)
             
             # Create the prompt
-            prompt = f"""Please parse the following receipt text and return the structured data as JSON:
-
-Allowed categories: {', '.join(ALLOWED_CATEGORIES)}
-
-For each item, assign a category from the allowed list only. If unsure, use 'Other'.
+            prompt = f"""Parse this receipt text and return ONLY valid JSON:
 
 {cleaned_text}
 
-Return only the JSON object, no additional text or explanations."""
+INSTRUCTIONS:
+1. Look at EACH line that contains a product name and price
+2. Lines with numbers that look like prices (e.g., 0.97, 9.98, 3.24) are likely items
+3. Extract ALL items you can find, not just the first few
+4. Look for patterns like: "PRODUCT_NAME PRICE" or "PRODUCT_NAME QUANTITY PRICE"
+5. The receipt shows "ITEMS SOLD 11" so there should be around 11 items
+
+Return ONLY a JSON object with this exact structure (no other text):
+{{
+  "store_name": "store name here",
+  "date": "date if found or null",
+  "time": "time if found or null", 
+  "items": [
+    {{
+      "name": "item name",
+      "quantity": quantity_number,
+      "unit_price": price_number,
+      "total_price": total_number,
+      "category": "category from: {', '.join(ALLOWED_CATEGORIES)}"
+    }}
+  ],
+  "subtotal": subtotal_number_or_null,
+  "tax": tax_number_or_null,
+  "total": total_number,
+  "change": change_number_or_null,
+  "payment_method": "payment_method_or_null"
+}}
+
+IMPORTANT: Return ONLY the JSON object, no explanations, no markdown, no additional text."""
 
             # Get response from Ollama
             response = self.client.chat(
@@ -250,16 +274,26 @@ Return only the JSON object, no additional text or explanations."""
         # Remove excessive whitespace
         text = re.sub(r'\s+', ' ', text)
         
-        # Remove common OCR artifacts
-        text = re.sub(r'[^\w\s\.\,\$\-\+\=\:\;\(\)\[\]\{\}]', '', text)
-        
         # Normalize line breaks
         text = text.replace('\r\n', '\n').replace('\r', '\n')
         
-        # Remove empty lines
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        # Split into lines and clean each line
+        lines = []
+        for line in text.split('\n'):
+            line = line.strip()
+            if line:
+                # Clean up the line but preserve important characters
+                line = re.sub(r'[^\w\s\.\,\$\-\+\=\:\;\(\)\[\]\{\}\#\@]', ' ', line)
+                line = re.sub(r'\s+', ' ', line).strip()
+                if line:
+                    lines.append(line)
         
-        return '\n'.join(lines)
+        # Add line numbers to help LLM identify items
+        numbered_lines = []
+        for i, line in enumerate(lines, 1):
+            numbered_lines.append(f"Line {i}: {line}")
+        
+        return '\n'.join(numbered_lines)
     
     def _extract_json_from_response(self, response: str) -> str:
         """Extract JSON from LLM response with better error handling"""
