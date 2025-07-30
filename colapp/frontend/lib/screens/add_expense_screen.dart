@@ -220,7 +220,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             // Category
             if (_categoriesLoaded)
               HierarchicalCategoryPicker(
-                initialCategory: item['category'],
+                selectedCategory: item['category'],
                 categoryHierarchy: _categoryHierarchy,
                 onCategorySelected: (category) => _updateItem(index, 'category', category),
               )

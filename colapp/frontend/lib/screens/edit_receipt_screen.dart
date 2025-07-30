@@ -237,7 +237,7 @@ class _EditReceiptScreenState extends State<EditReceiptScreen> {
                               Expanded(
                                 child: _categoriesLoaded
                                     ? HierarchicalCategoryPicker(
-                                        initialCategory: items[i].category,
+                                        selectedCategory: items[i].category,
                                         categoryHierarchy: _categoryHierarchy,
                                         onCategorySelected: (category) => setState(() => items[i].category = category),
                                       )
