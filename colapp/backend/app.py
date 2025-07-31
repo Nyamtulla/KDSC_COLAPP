@@ -30,6 +30,7 @@ import io
 from redis import Redis
 from rq import Queue
 from tasks import process_receipt
+from itsdangerous import URLSafeTimedSerializer
 
 # Import offline parsing components
 try:
@@ -101,6 +102,13 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 db.init_app(app)
 jwt = JWTManager(app)
 
+# === Password Reset Config ===
+SECRET_KEY = app.config['JWT_SECRET_KEY']
+RESET_TOKEN_EXPIRY = 3600  # 1 hour
+
+# In-memory set to track used password reset tokens (single-process only)
+used_reset_tokens = set()
+
 # Redis connection (use Docker Compose service name)
 redis_host = os.environ.get('REDIS_HOST', 'redis')
 redis_port = int(os.environ.get('REDIS_PORT', 6379))
@@ -120,6 +128,23 @@ else:
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def generate_reset_token(email):
+    s = URLSafeTimedSerializer(SECRET_KEY)
+    return s.dumps(email, salt='password-reset-salt')
+
+def verify_reset_token(token, max_age=RESET_TOKEN_EXPIRY):
+    s = URLSafeTimedSerializer(SECRET_KEY)
+    try:
+        email = s.loads(token, salt='password-reset-salt', max_age=max_age)
+    except Exception:
+        return None
+    return email
+
+def send_email(to_email, subject, body):
+    # For demo: just print the email
+    print(f'---\nTo: {to_email}\nSubject: {subject}\n\n{body}\n---')
+    # For production, use smtplib or flask-mail to send real emails
 
 def parse_receipt_text(text):
     """Legacy heuristic parsing function - kept for fallback"""
@@ -223,6 +248,18 @@ def login():
         access_token = create_access_token(identity=user.email)
         return jsonify(access_token=access_token)
     return jsonify({"error": "Invalid email or password"}), 401
+
+@app.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.get_json()
+    email = data.get('email')
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'success': True})  # Don't reveal if user exists
+    token = generate_reset_token(user.email)
+    reset_link = f'http://localhost:5000/reset-password?token={token}'
+    send_email(user.email, 'Password Reset', f'Click here to reset your password: {reset_link}')
+    return jsonify({'success': True})
 
 # === Receipt Routes ===
 @app.route('/upload-receipt', methods=['POST'])

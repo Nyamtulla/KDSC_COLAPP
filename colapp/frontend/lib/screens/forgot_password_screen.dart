@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'register_screen.dart';
-import 'home_screen.dart';
-import 'forgot_password_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 
@@ -10,22 +7,26 @@ final primaryBlue = Color(0xFF0051BA);
 final accentYellow = Color(0xFFEC944A);
 final backgroundLight = Color(0xFFEAF3F9);
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final _emailController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _login() async {
-    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showErrorSnackBar('Please fill in all fields');
+  Future<void> _resetPassword() async {
+    if (_emailController.text.isEmpty) {
+      _showSnackBar('Please enter your email address', isError: true);
+      return;
+    }
+
+    // Basic email validation
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_emailController.text)) {
+      _showSnackBar('Please enter a valid email address', isError: true);
       return;
     }
 
@@ -34,20 +35,19 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final result = await ApiService.login(
-        _usernameController.text.trim(),
-        _passwordController.text,
-      );
+      final result = await ApiService.forgotPassword(_emailController.text.trim());
 
       if (result['success']) {
-        // Store the token (you might want to use shared_preferences or secure_storage)
-        ApiService.setAuthToken(result['token']);
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomeScreen()));
+        _showSnackBar(result['message'] ?? 'Password reset email sent successfully!', isError: false);
+        // Navigate back to login screen after a short delay
+        Future.delayed(Duration(seconds: 2), () {
+          Navigator.pop(context);
+        });
       } else {
-        _showErrorSnackBar(result['error']);
+        _showSnackBar(result['error'], isError: true);
       }
     } catch (e) {
-      _showErrorSnackBar('An error occurred: $e');
+      _showSnackBar('An error occurred: $e', isError: true);
     } finally {
       setState(() {
         _isLoading = false;
@@ -55,12 +55,12 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showErrorSnackBar(String message) {
+  void _showSnackBar(String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
-        duration: Duration(seconds: 3),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: Duration(seconds: 4),
       ),
     );
   }
@@ -105,21 +105,30 @@ class _LoginScreenState extends State<LoginScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Image.asset(
-                          'assets/kansas-commerce-logo.webp', // Make sure asset path is correct!
+                          'assets/kansas-commerce-logo.webp',
                           height: 100,
                           fit: BoxFit.contain,
                         ),
                         SizedBox(height: 18),
                         Text(
-                            "Cost of Living",
-                            style: GoogleFonts.satisfy( // <- wavy, fun, script-like font
-                              fontSize: 42,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w400,
-                            ),
+                          "Cost of Living",
+                          style: GoogleFonts.satisfy(
+                            fontSize: 42,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w400,
                           ),
+                        ),
                       ],
                     ),
+                  ),
+                ),
+                // Back button
+                Positioned(
+                  top: 50,
+                  left: 16,
+                  child: IconButton(
+                    icon: Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ),
               ],
@@ -127,8 +136,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
             SizedBox(height: 32),
             Text(
-              "Welcome back",
+              "Forgot Password",
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: primaryBlue),
+            ),
+            SizedBox(height: 8),
+            Text(
+              "Enter your email to reset your password",
+              style: TextStyle(fontSize: 14, color: Colors.black54),
+              textAlign: TextAlign.center,
             ),
             Center(
               child: ConstrainedBox(
@@ -139,51 +154,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: Text("User name (Email)", style: TextStyle(fontSize: 14, color: Colors.black54)),
+                        child: Text("Email Address", style: TextStyle(fontSize: 14, color: Colors.black54)),
                       ),
                       SizedBox(height: 4),
                       TextField(
-                        controller: _usernameController,
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
-                          hintText: "User name",
-                        ),
-                      ),
-                      SizedBox(height: 18),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text("Password", style: TextStyle(fontSize: 14, color: Colors.black54)),
-                      ),
-                      SizedBox(height: 4),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          hintText: "Password",
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                            ),
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: GestureDetector(
-                          child: Text(
-                            "Forgot Password?",
-                            style: TextStyle(
-                              color: accentYellow,
-                              fontWeight: FontWeight.w600,
-                              decoration: TextDecoration.underline,
-                              fontSize: 14,
-                            ),
-                          ),
-                          onTap: () => Navigator.push(
-                            context, 
-                            MaterialPageRoute(builder: (_) => ForgotPasswordScreen())
-                          ),
+                          hintText: "Enter your email address",
                         ),
                       ),
                       SizedBox(height: 28),
@@ -195,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _login,
+                              onPressed: _isLoading ? null : _resetPassword,
                               child: _isLoading
                                   ? SizedBox(
                                       height: 20,
@@ -205,7 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                       ),
                                     )
-                                  : Text("Log in", style: TextStyle(fontSize: 16)),
+                                  : Text("Send Reset Email", style: TextStyle(fontSize: 16)),
                             ),
                           ),
                         ),
@@ -214,17 +192,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text("Don't have an Account? "),
+                          Text("Remember your password? "),
                           GestureDetector(
                             child: Text(
-                              "Create Account",
+                              "Back to Login",
                               style: TextStyle(
                                 color: accentYellow,
                                 fontWeight: FontWeight.w600,
                                 decoration: TextDecoration.underline,
                               ),
                             ),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RegisterScreen())),
+                            onTap: () => Navigator.pop(context),
                           )
                         ],
                       ),
@@ -238,4 +216,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
+} 
