@@ -9,8 +9,8 @@ class ApiService {
   static String get baseUrl {
     if (kIsWeb) {
       // Production URL - update this with your actual production API URL
-      return 'http://api.nyamshaik.me'; // For production (HTTP)
-      // return 'https://api.nyamshaik.me'; // For production (HTTPS) - uncomment when HTTPS is set up
+      return 'https://api.nyamshaik.me'; // For production (HTTPS)
+      // return 'http://api.nyamshaik.me'; // For production (HTTP) - fallback if needed
       // return 'http://localhost:5000'; // For local testing (HTTP)
     } else {
       // For Android emulator, use 10.0.2.2 to access host machine
