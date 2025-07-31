@@ -180,15 +180,14 @@ class OfflineLLMService:
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for receipt parsing"""
-        return """Parse receipt and extract products. Return JSON only.
+        return """Parse receipt and extract products. Return ONLY valid JSON.
 
 RULES:
 1. Find ALL product names from receipt
 2. Use 0.0 for missing prices, 1.0 for missing quantities
-3. Use null for missing fields
-4. Convert prices to numbers (remove $)
-5. For store_name: Extract ONLY the business name (first line), NOT entire receipt
-6. Use these BLS categories:
+3. Convert prices to numbers (remove $)
+4. For store_name: Extract ONLY the business name (first line), NOT entire receipt
+5. Use these BLS categories:
    - Food and Beverages > Food at home > Cereals and bakery products
    - Food and Beverages > Food at home > Meats poultry fish and eggs
    - Food and Beverages > Food at home > Dairy and related products
@@ -256,7 +255,20 @@ JSON:
 
 {cleaned_text}
 
-Return JSON with all products found."""
+Return ONLY a valid JSON object with this structure:
+{{
+  "store_name": "store name",
+  "items": [
+    {{
+      "name": "product name",
+      "quantity": 1.0,
+      "unit_price": price,
+      "total_price": price,
+      "category": "Food and Beverages > Food at home > Other food at home"
+    }}
+  ],
+  "total": total_amount
+}}"""
 
             # Get response from Ollama with optimized settings for speed
             response = self.client.chat(
@@ -279,11 +291,41 @@ Return JSON with all products found."""
                 first_message = next(response)
             else:
                 first_message = response
-            json_str = self._extract_json_from_response(first_message['message']['content'])
+            
+            content = first_message['message']['content']
+            print("LLM raw response:", content)  # Debug the raw response
+            
+            # Try to extract JSON
+            json_str = self._extract_json_from_response(content)
+            
+            # If no JSON found, try to create a basic structure
+            if not json_str or json_str.strip() == '':
+                print("No JSON found in response, creating basic structure")
+                # Extract store name from first line
+                lines = cleaned_text.split('\n')
+                store_name = lines[0] if lines else "Unknown Store"
+                if len(store_name) > 50:
+                    store_name = store_name[:47] + "..."
+                
+                # Create basic JSON structure
+                json_str = f'''{{
+                    "store_name": "{store_name}",
+                    "items": [],
+                    "total": 0.0
+                }}'''
             
             # Parse and validate JSON
-            parsed_data = json.loads(json_str)
-            print("LLM raw parsed_data:", parsed_data)
+            try:
+                parsed_data = json.loads(json_str)
+                print("LLM raw parsed_data:", parsed_data)
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error: {e}")
+                # Create fallback JSON
+                parsed_data = {
+                    "store_name": "Unknown Store",
+                    "items": [],
+                    "total": 0.0
+                }
             
             # Validate against schema
             validated_data = self._validate_and_clean_data(parsed_data)
@@ -562,6 +604,8 @@ Return JSON with all products found."""
             r'ALBERTSONS': 'Albertsons',
             r'WHOLE\s*FOODS|WHOLE\s*FOOD': 'Whole Foods',
             r'TRADER\s*JOE': 'Trader Joe\'s',
+            r'SPARKY': 'Sparky',
+            r'SPAR': 'Spar',
         }
         
         # Check for known store patterns first
