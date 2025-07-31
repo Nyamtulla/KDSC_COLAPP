@@ -1,13 +1,3 @@
-void main() {
-  final Map<String, List<String>> deduped = {};
-  kansasCountiesAndCities.forEach((county, cities) {
-    final uniqueCities = cities.toSet().toList()..sort();
-    deduped[county] = uniqueCities;
-  });
-
-  // Print or use deduped as your new data
-  print(deduped);
-}
 
 // Complete list of all 105 Kansas counties with ALL their cities
 const Map<String, List<String>> kansasCountiesAndCities = {
