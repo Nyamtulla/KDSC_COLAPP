@@ -185,11 +185,13 @@ class OfflineLLMService:
 IMPORTANT: You MUST respond with valid JSON. Do not include any other text.
 
 RULES:
-1. Find ALL product names from receipt
+1. Find ONLY real product names from receipt (skip totals, taxes, discounts)
 2. Use 0.0 for missing prices, 1.0 for missing quantities
 3. Convert prices to numbers (remove $)
 4. Extract store name from first line
-5. Use these BLS categories:
+5. Look for lines with prices at the end (like "PRODUCT 12.99")
+6. Skip lines that are clearly not products (TOTAL, TAX, CHANGE, etc.)
+7. Use these BLS categories:
    - Food and Beverages > Food at home > Cereals and bakery products
    - Food and Beverages > Food at home > Meats poultry fish and eggs
    - Food and Beverages > Food at home > Dairy and related products
@@ -253,12 +255,12 @@ You must respond with valid JSON containing the store name, all products found, 
                         {"role": "user", "content": f"{self.system_prompt}\n\n{prompt}"}
                     ],
                     options={
-                        "temperature": 0.1,  # Slight randomness for better output
+                        "temperature": 0.0,  # Zero temperature for consistent output
                         "top_p": 0.9,
-                        "num_predict": 1024,  # More tokens for complete response
-                        "num_ctx": 2048,     # Larger context window
-                        "repeat_penalty": 1.1, # Slight repetition penalty
-                        "stop": ["```", "```json"]  # Only stop at code blocks
+                        "num_predict": 2048,  # Much more tokens for complete response
+                        "num_ctx": 4096,     # Much larger context window
+                        "repeat_penalty": 1.0, # No repetition penalty
+                        "stop": ["```", "```json", "```\n"]  # Stop at code blocks
                     }
                 )
                 print("LLM response received successfully")
@@ -308,12 +310,23 @@ You must respond with valid JSON containing the store name, all products found, 
                 print("LLM raw parsed_data:", parsed_data)
             except json.JSONDecodeError as e:
                 print(f"JSON decode error: {e}")
-                # Create fallback JSON
-                parsed_data = {
-                    "store_name": "Unknown Store",
-                    "items": [],
-                    "total": 0.0
-                }
+                # Try to fix truncated JSON
+                try:
+                    # If JSON is truncated, try to complete it
+                    if json_str.strip().endswith(','):
+                        json_str = json_str.rstrip(',') + ']}'
+                    elif not json_str.strip().endswith('}'):
+                        json_str = json_str.rstrip() + '}'
+                    
+                    parsed_data = json.loads(json_str)
+                    print("Fixed truncated JSON:", parsed_data)
+                except:
+                    # Create fallback JSON
+                    parsed_data = {
+                        "store_name": "Unknown Store",
+                        "items": [],
+                        "total": 0.0
+                    }
             
             # Validate against schema
             validated_data = self._validate_and_clean_data(parsed_data)
