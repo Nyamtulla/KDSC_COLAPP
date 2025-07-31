@@ -284,18 +284,33 @@ Return ONLY a JSON object with ALL products found:
 
 IMPORTANT: Focus on finding ALL products and use the exact BLS category paths listed in the system prompt."""
 
-            # Get response from Ollama
-            response = self.client.chat(
-                model=self.model_name,
-                messages=[
-                    {"role": "user", "content": f"{self.system_prompt}\n\n{prompt}"}
-                ],
-                options={
-                    "temperature": 0.1,  # Low temperature for consistent output
-                    "top_p": 0.9,
-                    "num_predict": 2048
-                }
-            )
+            # Get response from Ollama with simple timeout
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("LLM request timed out")
+            
+            # Set timeout to 30 seconds (much less than the 180s task timeout)
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)
+            
+            try:
+                response = self.client.chat(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "user", "content": f"{self.system_prompt}\n\n{prompt}"}
+                    ],
+                    options={
+                        "temperature": 0.1,  # Low temperature for consistent output
+                        "top_p": 0.9,
+                        "num_predict": 1024  # Reduced for faster response
+                    }
+                )
+                signal.alarm(0)  # Cancel the alarm
+            except TimeoutError:
+                signal.alarm(0)  # Cancel the alarm
+                logger.error("LLM request timed out after 30 seconds, using fallback parsing")
+                return self._fallback_parse_receipt(cleaned_text)
             
             # Extract JSON from response
             if isinstance(response, Iterator):
@@ -589,7 +604,7 @@ IMPORTANT: Focus on finding ALL products and use the exact BLS category paths li
             r'COSTCO': 'Costco',
             r'SAFEWAY': 'Safeway',
             r'ALBERTSONS': 'Albertsons',
-            r'WHOLE\s*FOODS': 'Whole Foods',
+            r'WHOLE\s*FOODS|WHOLE\s*FOOD': 'Whole Foods',
             r'TRADER\s*JOE': 'Trader Joe\'s',
         }
         
@@ -617,6 +632,29 @@ IMPORTANT: Focus on finding ALL products and use the exact BLS category paths li
         
         return "Unknown Store"
 
+    def _determine_category(self, product_name: str) -> str:
+        """Determine BLS category based on product name keywords"""
+        product_upper = product_name.upper()
+        
+        # Food and Beverages - Food at home
+        if any(word in product_upper for word in ['MILK', 'YOGURT', 'CHEESE', 'BUTTER', 'CREAM', 'COTTAGE']):
+            return 'Food and Beverages > Food at home > Dairy and related products'
+        
+        if any(word in product_upper for word in ['APPLE', 'BANANA', 'ORANGE', 'MANGO', 'STRAWBERRY', 'PLUM', 'FRUIT', 'VEGETABLE', 'BEAN']):
+            return 'Food and Beverages > Food at home > Fruits and vegetables'
+        
+        if any(word in product_upper for word in ['BEEF', 'CHICKEN', 'PORK', 'FISH', 'MAHI', 'FILLET', 'MEAT']):
+            return 'Food and Beverages > Food at home > Meats, poultry, fish, and eggs'
+        
+        if any(word in product_upper for word in ['BREAD', 'CEREAL', 'PASTA', 'RICE', 'FLOUR', 'TORTILLA']):
+            return 'Food and Beverages > Food at home > Cereals and bakery products'
+        
+        if any(word in product_upper for word in ['WATER', 'SODA', 'JUICE', 'COFFEE', 'TEA', 'BEVERAGE']):
+            return 'Food and Beverages > Food at home > Nonalcoholic beverages and beverage materials'
+        
+        # Default to other food at home
+        return 'Food and Beverages > Food at home > Other food at home'
+
     def _fallback_parse_receipt(self, text: str) -> Dict[str, Any]:
         """Fallback parsing when LLM times out - use simple regex patterns"""
         try:
@@ -629,29 +667,44 @@ IMPORTANT: Focus on finding ALL products and use the exact BLS category paths li
             total_match = re.search(r'TOTAL.*?(\d+\.?\d*)', text, re.IGNORECASE)
             total = float(total_match.group(1)) if total_match else 0.0
             
-            # Extract items using simple patterns
+            # Extract items using improved patterns
             items = []
             lines = text.split('\n')
             
             for line in lines:
-                # Look for lines with prices
-                price_match = re.search(r'(\d+\.?\d*)\s*$', line.strip())
-                if price_match and len(line.strip()) > 5:
+                line = line.strip()
+                if not line or len(line) < 3:
+                    continue
+                
+                # Look for lines with prices at the end
+                price_match = re.search(r'(\d+\.?\d*)\s*$', line)
+                if price_match:
                     price = float(price_match.group(1))
                     # Extract product name (everything before the price)
-                    product_name = line.strip()[:-len(price_match.group(0))].strip()
+                    product_name = line[:-len(price_match.group(0))].strip()
                     
                     # Skip non-product lines
-                    if any(skip in product_name.upper() for skip in ['TOTAL', 'SUBTOTAL', 'TAX', 'CHANGE', 'ITEMS SOLD']):
+                    if any(skip in product_name.upper() for skip in ['TOTAL', 'SUBTOTAL', 'TAX', 'CHANGE', 'ITEMS SOLD', 'TARE', 'ITEM']):
                         continue
                     
+                    # Skip lines that are just numbers or too short
+                    if re.match(r'^[\d\s\.\$]+$', product_name) or len(product_name) < 2:
+                        continue
+                    
+                    # Clean up product name
+                    product_name = re.sub(r'[^\w\s\-\.]', ' ', product_name)
+                    product_name = ' '.join(product_name.split())
+                    
                     if product_name and len(product_name) > 2:
+                        # Determine category based on product name
+                        category = self._determine_category(product_name)
+                        
                         items.append({
                             'name': product_name,
                             'quantity': 1.0,
                             'unit_price': price,
                             'total_price': price,
-                            'category': 'Food and Beverages > Food at home > Other food at home'
+                            'category': category
                         })
             
             # Truncate store name to fit database field
