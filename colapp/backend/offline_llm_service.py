@@ -180,13 +180,13 @@ class OfflineLLMService:
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for receipt parsing"""
-        return """Parse receipt and extract products. Return ONLY valid JSON.
+        return """Parse receipt and extract products. Return JSON only.
 
 RULES:
 1. Find ALL product names from receipt
 2. Use 0.0 for missing prices, 1.0 for missing quantities
 3. Convert prices to numbers (remove $)
-4. For store_name: Extract ONLY the business name (first line), NOT entire receipt
+4. Extract store name from first line
 5. Use these BLS categories:
    - Food and Beverages > Food at home > Cereals and bakery products
    - Food and Beverages > Food at home > Meats poultry fish and eggs
@@ -196,43 +196,28 @@ RULES:
    - Food and Beverages > Food at home > Other food at home
    - Food and Beverages > Food away from home > Full service meals and snacks
    - Food and Beverages > Food away from home > Limited service meals and snacks
-   - Food and Beverages > Food away from home > Other food away from home
-   - Food and Beverages > Alcoholic beverages > Beer ale and other malt beverages at home
-   - Food and Beverages > Alcoholic beverages > Wine at home
-   - Food and Beverages > Alcoholic beverages > Distilled spirits at home
-   - Housing > Shelter > Rent of primary residence
-   - Housing > Fuels and utilities > Gas piped and electricity
    - Housing > Household furnishings and operations > Housekeeping supplies
    - Apparel > Mens and boys apparel
    - Apparel > Womens and girls apparel
    - Apparel > Footwear
    - Transportation > Private transportation > Motor fuel
-   - Transportation > Private transportation > Motor vehicle maintenance and repair
    - Medical Care > Medical care commodities > Medicinal drugs
-   - Recreation > Video and audio
    - Recreation > Pets pet products and services
-   - Education and Communication > Communication > Telephone services
    - Other Goods and Services > Personal care > Personal care services
 
 JSON:
 {
-  "store_name": "store name or null",
-  "date": "date or null",
-  "time": "time or null",
+  "store_name": "store name",
   "items": [
     {
       "name": "product name",
-      "quantity": quantity or 1.0,
-      "unit_price": price or 0.0,
-      "total_price": total or 0.0,
+      "quantity": 1.0,
+      "unit_price": price,
+      "total_price": price,
       "category": "BLS category path"
     }
   ],
-  "subtotal": subtotal or null,
-  "tax": tax or null,
-  "total": total or null,
-  "change": change or null,
-  "payment_method": "payment method or null"
+  "total": total_amount
 }"""
     
     def parse_receipt_text(self, text: str) -> Dict[str, Any]:
@@ -255,42 +240,46 @@ JSON:
 
 {cleaned_text}
 
-Return ONLY a valid JSON object with this structure:
-{{
-  "store_name": "store name",
-  "items": [
-    {{
-      "name": "product name",
-      "quantity": 1.0,
-      "unit_price": price,
-      "total_price": price,
-      "category": "Food and Beverages > Food at home > Other food at home"
-    }}
-  ],
-  "total": total_amount
-}}"""
+Return JSON with all products found."""
 
             # Get response from Ollama with optimized settings for speed
-            response = self.client.chat(
-                model=self.model_name,
-                messages=[
-                    {"role": "user", "content": f"{self.system_prompt}\n\n{prompt}"}
-                ],
-                options={
-                    "temperature": 0.0,  # Zero temperature for most consistent output
-                    "top_p": 0.8,
-                    "num_predict": 512,  # Much smaller for faster response
-                    "num_ctx": 1024,     # Smaller context window
-                    "repeat_penalty": 1.0, # No repetition penalty for speed
-                    "stop": ["```", "```json", "```\n", "\n\n\n"]  # Stop at code blocks
+            try:
+                print("Sending request to LLM...")
+                response = self.client.chat(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "user", "content": f"{self.system_prompt}\n\n{prompt}"}
+                    ],
+                    options={
+                        "temperature": 0.0,  # Zero temperature for most consistent output
+                        "top_p": 0.8,
+                        "num_predict": 512,  # Much smaller for faster response
+                        "num_ctx": 1024,     # Smaller context window
+                        "repeat_penalty": 1.0, # No repetition penalty for speed
+                        "stop": ["```", "```json", "```\n", "\n\n\n"]  # Stop at code blocks
+                    }
+                )
+                print("LLM response received successfully")
+            except Exception as e:
+                print(f"LLM call failed: {e}")
+                # Return fallback data
+                return {
+                    'success': True,
+                    'data': self._get_fallback_data(),
+                    'method': 'offline_llm',
+                    'model': self.model_name,
+                    'confidence': 0.5
                 }
-            )
             
             # Extract JSON from response
+            print("Processing LLM response...")
             if isinstance(response, Iterator):
                 first_message = next(response)
             else:
                 first_message = response
+            
+            print("Response type:", type(response))
+            print("First message:", first_message)
             
             content = first_message['message']['content']
             print("LLM raw response:", content)  # Debug the raw response
@@ -301,11 +290,8 @@ Return ONLY a valid JSON object with this structure:
             # If no JSON found, try to create a basic structure
             if not json_str or json_str.strip() == '':
                 print("No JSON found in response, creating basic structure")
-                # Extract store name from first line
-                lines = cleaned_text.split('\n')
-                store_name = lines[0] if lines else "Unknown Store"
-                if len(store_name) > 50:
-                    store_name = store_name[:47] + "..."
+                # Extract store name using the dedicated method
+                store_name = self._extract_store_name(cleaned_text)
                 
                 # Create basic JSON structure
                 json_str = f'''{{
