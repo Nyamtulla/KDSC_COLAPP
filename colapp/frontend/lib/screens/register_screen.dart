@@ -3,28 +3,11 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'login_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
+import '../utils/kansas_data.dart';
 
 // === Theme Colors ===
 final primaryBlue = Color(0xFF0051BA);
 final accentYellow = Color(0xFFEC944A);
-
-// === Data ===
-const Map<String, List<String>> kansasCountiesAndCities = {
-  'Douglas': ['Lawrence', 'Eudora', 'Baldwin City'],
-  'Johnson': ['Overland Park', 'Olathe', 'Shawnee', 'Lenexa'],
-  'Sedgwick': ['Wichita', 'Derby', 'Haysville'],
-  'Shawnee': ['Topeka', 'Auburn'],
-  'Wyandotte': ['Kansas City', 'Edwardsville', 'Bonner Springs'],
-  // Add more counties and cities...
-};
-const List<String> kansasCounties = [
-  'Douglas',
-  'Johnson',
-  'Sedgwick',
-  'Shawnee',
-  'Wyandotte',
-  // Add more counties...
-];
 const List<String> sexes = [
   'Male', 'Female', 'Other', 'Prefer not to say'
 ];
