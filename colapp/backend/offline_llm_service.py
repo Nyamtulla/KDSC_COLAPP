@@ -180,57 +180,61 @@ class OfflineLLMService:
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for receipt parsing"""
-        return """You are an expert receipt parser. Focus on identifying ALL products from receipt text.
+        return """Parse receipt and extract products. Return JSON only.
 
-CRITICAL RULES:
-1. Your main goal is to find ALL product names from the receipt
-2. Extract as many products as possible, even if you can't get prices or quantities
-3. Return valid JSON with proper quotes and structure
-4. Use 0.0 for missing prices, 1.0 for missing quantities
-5. Use null for missing fields like date, time, payment method
-6. Convert all prices to numbers (remove $ symbols)
-7. For store_name: Extract ONLY the business/store name (first line or header), NOT the entire receipt text
-8. Categorize items using BLS Consumer Price Index categories:
-   - Food and Beverages > Food at home > [Cereals and bakery products, Meats poultry fish and eggs, Dairy and related products, Fruits and vegetables, Nonalcoholic beverages and beverage materials, Other food at home]
-   - Food and Beverages > Food away from home > [Full service meals and snacks, Limited service meals and snacks, Food at employee sites and schools, Food at elementary and secondary schools, Food from vending machines and mobile vendors, Other food away from home]
-   - Food and Beverages > Alcoholic beverages > [Beer ale and other malt beverages at home, Beer ale and other malt beverages away from home, Wine at home, Wine away from home, Distilled spirits at home, Distilled spirits away from home]
-   - Housing > Shelter > [Rent of primary residence, Lodging away from home, Owners equivalent rent of residences, Tenants and household insurance]
-   - Housing > Fuels and utilities > [Fuel oil and other fuels, Gas piped and electricity, Water and sewer and trash collection services]
-   - Housing > Household furnishings and operations > [Window and floor coverings and other linens, Furniture and bedding, Appliances, Tools hardware outdoor equipment and supplies, Housekeeping supplies, Household cleaning products, Paper and plastic products, Miscellaneous household products, Household operations]
-   - Apparel > [Mens and boys apparel, Womens and girls apparel, Infants and toddlers apparel, Footwear, Jewelry and watches]
-   - Transportation > Private transportation > [New and used motor vehicles, Motor fuel, Motor vehicle parts and equipment, Motor vehicle maintenance and repair, Motor vehicle insurance, Motor vehicle fees]
-   - Transportation > Public transportation > [Airline fare, Other intercity transportation, Intracity transportation]
-   - Medical Care > Medical care commodities > [Medicinal drugs, Medical equipment and supplies]
-   - Medical Care > Medical care services > [Professional services, Hospital and related services, Health insurance]
-   - Recreation > [Video and audio, Pets pet products and services, Sporting goods, Photography, Other recreational goods, Recreation services]
-   - Education and Communication > Education > [Educational books and supplies, Tuition other school fees and childcare, College tuition and fees, Elementary and high school tuition and fees, Child care and nursery school, Technical and business school tuition and fees]
-   - Education and Communication > Communication > [Postage and delivery services, Telephone services, Information technology hardware and services]
-   - Other Goods and Services > Tobacco and smoking products > [Cigarettes, Other tobacco products and smoking accessories]
-   - Other Goods and Services > Personal care > [Hair dental shaving and miscellaneous personal care products, Cosmetics perfume bath nail preparations and implements, Personal care services]
-   - Other Goods and Services > Miscellaneous personal services > [Legal services, Funeral expenses, Laundry and dry cleaning services, Apparel services other than laundry and dry cleaning, Financial services, Checking account and other bank services, Tax return preparation and other accounting fees, Miscellaneous personal services]
+RULES:
+1. Find ALL product names from receipt
+2. Use 0.0 for missing prices, 1.0 for missing quantities
+3. Use null for missing fields
+4. Convert prices to numbers (remove $)
+5. For store_name: Extract ONLY the business name (first line), NOT entire receipt
+6. Use these BLS categories:
+   - Food and Beverages > Food at home > Cereals and bakery products
+   - Food and Beverages > Food at home > Meats poultry fish and eggs
+   - Food and Beverages > Food at home > Dairy and related products
+   - Food and Beverages > Food at home > Fruits and vegetables
+   - Food and Beverages > Food at home > Nonalcoholic beverages and beverage materials
+   - Food and Beverages > Food at home > Other food at home
+   - Food and Beverages > Food away from home > Full service meals and snacks
+   - Food and Beverages > Food away from home > Limited service meals and snacks
+   - Food and Beverages > Food away from home > Other food away from home
+   - Food and Beverages > Alcoholic beverages > Beer ale and other malt beverages at home
+   - Food and Beverages > Alcoholic beverages > Wine at home
+   - Food and Beverages > Alcoholic beverages > Distilled spirits at home
+   - Housing > Shelter > Rent of primary residence
+   - Housing > Fuels and utilities > Gas piped and electricity
+   - Housing > Household furnishings and operations > Housekeeping supplies
+   - Apparel > Mens and boys apparel
+   - Apparel > Womens and girls apparel
+   - Apparel > Footwear
+   - Transportation > Private transportation > Motor fuel
+   - Transportation > Private transportation > Motor vehicle maintenance and repair
+   - Medical Care > Medical care commodities > Medicinal drugs
+   - Recreation > Video and audio
+   - Recreation > Pets pet products and services
+   - Education and Communication > Communication > Telephone services
+   - Other Goods and Services > Personal care > Personal care services
 
-JSON Structure:
+JSON:
 {
-  "store_name": "store name if found or null",
-  "date": "date if found or null",
-  "time": "time if found or null",
+  "store_name": "store name or null",
+  "date": "date or null",
+  "time": "time or null",
   "items": [
     {
-      "name": "product name you can identify",
-      "quantity": quantity if found or 1.0,
-      "unit_price": price if found or 0.0,
-      "total_price": total if found or 0.0,
-      "category": "BLS category path (e.g., 'Food and Beverages > Food at home > Dairy and related products')"
+      "name": "product name",
+      "quantity": quantity or 1.0,
+      "unit_price": price or 0.0,
+      "total_price": total or 0.0,
+      "category": "BLS category path"
     }
   ],
-  "subtotal": subtotal if found or null,
-  "tax": tax if found or null,
-  "total": total if found or null,
-  "change": change if found or null,
-  "payment_method": "payment method if found or null"
-}
-
-IMPORTANT: Focus on finding ALL products and use the exact BLS category paths listed above."""
+  "subtotal": subtotal or null,
+  "tax": tax or null,
+  "total": total or null,
+  "change": change or null,
+  "payment_method": "payment method or null"
+}"""
     
     def parse_receipt_text(self, text: str) -> Dict[str, Any]:
         """
@@ -248,69 +252,27 @@ IMPORTANT: Focus on finding ALL products and use the exact BLS category paths li
             print("LLM parsed raw OCR text:", cleaned_text)
             
             # Create the prompt
-            prompt = f"""Parse this receipt text and extract ALL products you can identify:
+            prompt = f"""Parse this receipt and extract products:
 
 {cleaned_text}
 
-INSTRUCTIONS:
-1. Focus on finding ALL product names from the receipt
-2. Look for any line that might contain a product name
-3. Extract as many products as you can see, even if you can't get prices or quantities
-4. If you can't determine a price, use 0.0
-5. If you can't determine quantity, use 1.0
-6. Use the exact BLS category paths from the system prompt for categorization
-7. The receipt shows "ITEMS SOLD 11" - try to find all 11 items
+Return JSON with all products found."""
 
-Return ONLY a JSON object with ALL products found:
-{{
-  "store_name": "store name if found or null",
-  "date": "date if found or null",
-  "time": "time if found or null", 
-  "items": [
-    {{
-      "name": "product name you can identify",
-      "quantity": quantity if found or 1.0,
-      "unit_price": price if found or 0.0,
-      "total_price": total if found or 0.0,
-      "category": "BLS category path (e.g., 'Food and Beverages > Food at home > Dairy and related products')"
-    }}
-  ],
-  "subtotal": subtotal if found or null,
-  "tax": tax if found or null,
-  "total": total if found or null,
-  "change": change if found or null,
-  "payment_method": "payment method if found or null"
-}}
-
-IMPORTANT: Focus on finding ALL products and use the exact BLS category paths listed in the system prompt."""
-
-            # Get response from Ollama with simple timeout
-            import signal
-            
-            def timeout_handler(signum, frame):
-                raise TimeoutError("LLM request timed out")
-            
-            # Set timeout to 30 seconds (much less than the 180s task timeout)
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(30)
-            
-            try:
-                response = self.client.chat(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "user", "content": f"{self.system_prompt}\n\n{prompt}"}
-                    ],
-                    options={
-                        "temperature": 0.1,  # Low temperature for consistent output
-                        "top_p": 0.9,
-                        "num_predict": 1024  # Reduced for faster response
-                    }
-                )
-                signal.alarm(0)  # Cancel the alarm
-            except TimeoutError:
-                signal.alarm(0)  # Cancel the alarm
-                logger.error("LLM request timed out after 30 seconds, using fallback parsing")
-                return self._fallback_parse_receipt(cleaned_text)
+            # Get response from Ollama with optimized settings for speed
+            response = self.client.chat(
+                model=self.model_name,
+                messages=[
+                    {"role": "user", "content": f"{self.system_prompt}\n\n{prompt}"}
+                ],
+                options={
+                    "temperature": 0.0,  # Zero temperature for most consistent output
+                    "top_p": 0.8,
+                    "num_predict": 512,  # Much smaller for faster response
+                    "num_ctx": 1024,     # Smaller context window
+                    "repeat_penalty": 1.0, # No repetition penalty for speed
+                    "stop": ["```", "```json", "```\n", "\n\n\n"]  # Stop at code blocks
+                }
+            )
             
             # Extract JSON from response
             if isinstance(response, Iterator):
@@ -443,29 +405,23 @@ IMPORTANT: Focus on finding ALL products and use the exact BLS category paths li
     
     def _preprocess_text(self, text: str) -> str:
         """Preprocess OCR text for better LLM parsing"""
-        # Remove excessive whitespace
+        # Remove excessive whitespace and normalize
         text = re.sub(r'\s+', ' ', text)
-        
-        # Normalize line breaks
         text = text.replace('\r\n', '\n').replace('\r', '\n')
         
         # Split into lines and clean each line
         lines = []
         for line in text.split('\n'):
             line = line.strip()
-            if line:
+            if line and len(line) > 2:  # Only keep meaningful lines
                 # Clean up the line but preserve important characters
-                line = re.sub(r'[^\w\s\.\,\$\-\+\=\:\;\(\)\[\]\{\}\#\@]', ' ', line)
+                line = re.sub(r'[^\w\s\.\,\$\-\+\=\:\;\(\)]', ' ', line)
                 line = re.sub(r'\s+', ' ', line).strip()
                 if line:
                     lines.append(line)
         
-        # Add line numbers to help LLM identify items
-        numbered_lines = []
-        for i, line in enumerate(lines, 1):
-            numbered_lines.append(f"Line {i}: {line}")
-        
-        return '\n'.join(numbered_lines)
+        # Return clean text without line numbers for faster processing
+        return '\n'.join(lines)
     
     def _extract_json_from_response(self, response: str) -> str:
         """Extract JSON from LLM response with better error handling"""
