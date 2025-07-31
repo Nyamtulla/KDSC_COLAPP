@@ -105,6 +105,29 @@ class ApiService {
     }
   }
 
+  // Reset password
+  static Future<Map<String, dynamic>> resetPassword(String token, String newPassword) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/reset-password'),
+        headers: _headers,
+        body: json.encode({
+          'token': token,
+          'new_password': newPassword,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': 'Password reset successfully'};
+      } else {
+        final error = json.decode(response.body);
+        return {'success': false, 'error': error['error'] ?? 'Failed to reset password'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
+
   // Receipt upload with OCR data
   static Future<Map<String, dynamic>> uploadReceipt({
     File? imageFile,

@@ -31,6 +31,9 @@ from redis import Redis
 from rq import Queue
 from tasks import process_receipt
 from itsdangerous import URLSafeTimedSerializer
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Import offline parsing components
 try:
@@ -49,29 +52,35 @@ except ImportError:
     print("Warning: BLS categories not available")
 
 app = Flask(__name__)
+
+# Apply security headers to all responses
+@app.after_request
+def apply_security_headers(response):
+    """Apply security headers to all responses"""
+    return add_security_headers(response)
+    
 # Configure CORS to allow requests from GitHub Pages and local development
 CORS(app, origins=[
-    "https://nyamshaik.me",            # Your custom domain (HTTPS)
-    "https://www.nyamshaik.me",        # Your custom domain with www
-    "http://nyamshaik.me",             # Your custom domain (HTTP)
-    "http://www.nyamshaik.me",         # Your custom domain with www (HTTP)
+    # Production HTTPS origins
+    "https://nyamshaik.me",            # Your custom domain (HTTPS) - PRIMARY
+    "https://www.nyamshaik.me",        # Your custom domain with www (HTTPS)
     "https://api.nyamshaik.me",        # Your API domain (HTTPS)
-    "http://api.nyamshaik.me",         # Your API domain (HTTP)
-    "https://nyamtull.github.io",      # Your GitHub Pages URL
-    "https://nyamtull.github.io/KDSC_COLAPP", # Your specific project URL
+    "https://nyamtull.github.io",      # Your GitHub Pages URL (HTTPS)
+    "https://nyamtull.github.io/KDSC_COLAPP", # Your specific project URL (HTTPS)
+    # Development HTTP origins (local only)
     "http://localhost:3000",           # For local development
     "http://localhost:3001",           # For local development (Flutter web)
     "http://localhost:8080",           # For local development
     "http://127.0.0.1:3000",          # For local development
     "http://127.0.0.1:3001",          # For local development (Flutter web)
     "http://127.0.0.1:8080"           # For local development
-], supports_credentials=True, methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+], supports_credentials=True, methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], allow_headers=["Content-Type", "Authorization"])
 
 # Handle preflight requests
 @app.route('/login', methods=['OPTIONS'])
 def handle_login_preflight():
     response = jsonify({'status': 'ok'})
-    response.headers.add('Access-Control-Allow-Origin', '*')
+    response = add_cors_headers(response)
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
@@ -81,7 +90,7 @@ def handle_login_preflight():
 @app.route('/<path:path>', methods=['OPTIONS'])
 def handle_options(path):
     response = jsonify({'status': 'ok'})
-    response.headers.add('Access-Control-Allow-Origin', '*')
+    response = add_cors_headers(response)
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
@@ -91,6 +100,68 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'super-secret-key'  # Change in production!
 
+# CORS helper function
+def add_cors_headers(response):
+    """Add CORS headers to response based on request origin"""
+    origin = request.headers.get('Origin')
+    
+    # Production HTTPS origins - prioritize these
+    allowed_origins = [
+        # Production HTTPS origins
+        "https://nyamshaik.me",            # PRIMARY - Your custom domain (HTTPS)
+        "https://www.nyamshaik.me",        # Your custom domain with www (HTTPS)
+        "https://api.nyamshaik.me",        # Your API domain (HTTPS)
+        "https://nyamtull.github.io",      # Your GitHub Pages URL (HTTPS)
+        "https://nyamtull.github.io/KDSC_COLAPP", # Your specific project URL (HTTPS)
+        # Development HTTP origins (local only)
+        "http://localhost:3000",           # For local development
+        "http://localhost:3001",           # For local development (Flutter web)
+        "http://localhost:8080",           # For local development
+        "http://127.0.0.1:3000",          # For local development
+        "http://127.0.0.1:3001",          # For local development (Flutter web)
+        "http://127.0.0.1:8080"           # For local development
+    ]
+    
+    # Always prefer HTTPS over HTTP for the same domain
+    if origin and origin.startswith('http://'):
+        https_version = origin.replace('http://', 'https://')
+        if https_version in allowed_origins:
+            response.headers.add('Access-Control-Allow-Origin', https_version)
+        elif origin in allowed_origins:
+            response.headers.add('Access-Control-Allow-Origin', origin)
+        else:
+            response.headers.add('Access-Control-Allow-Origin', 'https://nyamshaik.me')
+    elif origin in allowed_origins:
+        response.headers.add('Access-Control-Allow-Origin', origin)
+    else:
+        response.headers.add('Access-Control-Allow-Origin', 'https://nyamshaik.me')
+    
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
+
+# Security headers helper function
+def add_security_headers(response):
+    """Add security headers to all responses"""
+    # HSTS (HTTP Strict Transport Security) - 2 years max-age
+    response.headers['Strict-Transport-Security'] = 'max-age=63072000; includeSubDomains; preload'
+    
+    # Content Security Policy (CSP) - basic protection
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
+    
+    # X-Content-Type-Options - prevent MIME type sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    
+    # X-Frame-Options - prevent clickjacking
+    response.headers['X-Frame-Options'] = 'DENY'
+    
+    # X-XSS-Protection - enable XSS protection
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    
+    # Referrer Policy - control referrer information
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    
+    return response
+
 # === Configure File Upload ===
 UPLOAD_FOLDER = os.path.normpath('uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'pdf'}
@@ -99,8 +170,22 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Create upload folder if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# === Email Configuration ===
+# Email settings - you can configure these via environment variables
+EMAIL_SMTP_SERVER = os.environ.get('EMAIL_SMTP_SERVER', 'smtp.gmail.com')
+EMAIL_SMTP_PORT = int(os.environ.get('EMAIL_SMTP_PORT', '587'))
+EMAIL_USERNAME = os.environ.get('EMAIL_USERNAME', 'your-email@gmail.com')
+EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', 'your-app-password')
+EMAIL_FROM_NAME = os.environ.get('EMAIL_FROM_NAME', 'ColApp Support')
+EMAIL_FROM_ADDRESS = os.environ.get('EMAIL_FROM_ADDRESS', EMAIL_USERNAME)
+
+# For development/testing, you can use a service like Mailtrap or just print to console
+EMAIL_ENABLED = os.environ.get('EMAIL_ENABLED', 'false').lower() == 'true'
+
 db.init_app(app)
 jwt = JWTManager(app)
+
+
 
 # === Password Reset Config ===
 SECRET_KEY = app.config['JWT_SECRET_KEY']
@@ -141,10 +226,49 @@ def verify_reset_token(token, max_age=RESET_TOKEN_EXPIRY):
         return None
     return email
 
-def send_email(to_email, subject, body):
-    # For demo: just print the email
-    print(f'---\nTo: {to_email}\nSubject: {subject}\n\n{body}\n---')
-    # For production, use smtplib or flask-mail to send real emails
+def send_email(to_email, subject, body, html_body=None):
+    """
+    Send email using SMTP or print to console for development
+    """
+    if not EMAIL_ENABLED:
+        # For development: just print the email
+        print(f'---\nTo: {to_email}\nSubject: {subject}\n\n{body}\n---')
+        return True
+    
+    try:
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['From'] = f"{EMAIL_FROM_NAME} <{EMAIL_FROM_ADDRESS}>"
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        
+        # Add plain text body
+        text_part = MIMEText(body, 'plain')
+        msg.attach(text_part)
+        
+        # Add HTML body if provided
+        if html_body:
+            html_part = MIMEText(html_body, 'html')
+            msg.attach(html_part)
+        
+        # Create SMTP session
+        server = smtplib.SMTP(EMAIL_SMTP_SERVER, EMAIL_SMTP_PORT)
+        server.starttls()  # Enable TLS
+        server.login(EMAIL_USERNAME, EMAIL_PASSWORD)
+        
+        # Send email
+        text = msg.as_string()
+        server.sendmail(EMAIL_FROM_ADDRESS, to_email, text)
+        server.quit()
+        
+        print(f"✅ Email sent successfully to {to_email}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Failed to send email to {to_email}: {str(e)}")
+        # Fallback to console printing
+        print(f'---\nTo: {to_email}\nSubject: {subject}\n\n{body}\n---')
+        return False
 
 def parse_receipt_text(text):
     """Legacy heuristic parsing function - kept for fallback"""
@@ -256,10 +380,122 @@ def forgot_password():
     user = User.query.filter_by(email=email).first()
     if not user:
         return jsonify({'success': True})  # Don't reveal if user exists
+    
     token = generate_reset_token(user.email)
-    reset_link = f'http://localhost:5000/reset-password?token={token}'
-    send_email(user.email, 'Password Reset', f'Click here to reset your password: {reset_link}')
-    return jsonify({'success': True})
+    
+    # Create reset link - use the frontend URL instead of backend
+    frontend_url = "https://nyamshaik.me"  # Your frontend domain (HTTPS)
+    reset_link = f'{frontend_url}/reset-password?token={token}'
+    
+    # Create email content
+    subject = "Password Reset Request - ColApp"
+    
+    # Plain text version
+    body = f"""
+Hello,
+
+You have requested to reset your password for your ColApp account.
+
+To reset your password, please click on the following link:
+{reset_link}
+
+This link will expire in 1 hour for security reasons.
+
+If you did not request this password reset, please ignore this email.
+
+Best regards,
+ColApp Support Team
+    """.strip()
+    
+    # HTML version
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+            .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+            .header {{ background-color: #007bff; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }}
+            .content {{ background-color: #f8f9fa; padding: 20px; border-radius: 0 0 5px 5px; }}
+            .button {{ display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+            .footer {{ margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>Password Reset Request</h1>
+            </div>
+            <div class="content">
+                <p>Hello,</p>
+                <p>You have requested to reset your password for your <strong>ColApp</strong> account.</p>
+                <p>To reset your password, please click the button below:</p>
+                <p style="text-align: center;">
+                    <a href="{reset_link}" class="button">Reset Password</a>
+                </p>
+                <p>Or copy and paste this link into your browser:</p>
+                <p style="word-break: break-all; background-color: #e9ecef; padding: 10px; border-radius: 3px;">
+                    {reset_link}
+                </p>
+                <p><strong>Important:</strong> This link will expire in 1 hour for security reasons.</p>
+                <p>If you did not request this password reset, please ignore this email.</p>
+                <div class="footer">
+                    <p>Best regards,<br>ColApp Support Team</p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    # Send email
+    email_sent = send_email(user.email, subject, body, html_body)
+    
+    if email_sent:
+        return jsonify({'success': True, 'message': 'Password reset email sent successfully'})
+    else:
+        return jsonify({'success': False, 'error': 'Failed to send password reset email'}), 500
+
+@app.route('/reset-password', methods=['POST'])
+def reset_password():
+    """
+    Reset password using token
+    """
+    data = request.get_json()
+    token = data.get('token')
+    new_password = data.get('new_password')
+    
+    if not token or not new_password:
+        return jsonify({'success': False, 'error': 'Token and new password are required'}), 400
+    
+    # Verify token
+    email = verify_reset_token(token)
+    if not email:
+        return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
+    
+    # Check if token was already used
+    if token in used_reset_tokens:
+        return jsonify({'success': False, 'error': 'Token already used'}), 400
+    
+    # Find user
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+    
+    # Hash new password
+    hashed_password = pbkdf2_sha256.hash(new_password)
+    user.password_hash = hashed_password
+    
+    # Mark token as used
+    used_reset_tokens.add(token)
+    
+    try:
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Password reset successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'Failed to reset password'}), 500
 
 # === Receipt Routes ===
 @app.route('/upload-receipt', methods=['POST'])
@@ -783,12 +1019,13 @@ def get_categories_hierarchy():
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    return jsonify({
+    response = jsonify({
         'status': 'healthy', 
         'message': 'ColApp API is running',
         'version': '1.0.0',
         'backend_ip': '34.57.48.173'
     }), 200
+    return add_cors_headers(response)
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)

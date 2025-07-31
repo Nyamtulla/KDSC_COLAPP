@@ -3,5 +3,11 @@
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">10.90.229.23</domain>
         <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+    <!-- HTTPS domains - no cleartext needed -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">nyamshaik.me</domain>
+        <domain includeSubdomains="true">api.nyamshaik.me</domain>
     </domain-config>
 </network-security-config> 
