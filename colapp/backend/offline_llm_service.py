@@ -180,7 +180,9 @@ class OfflineLLMService:
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for receipt parsing"""
-        return """Parse receipt and extract products. Return JSON only.
+        return """You are a receipt parsing assistant. Extract products and information from receipts.
+
+IMPORTANT: You MUST respond with valid JSON. Do not include any other text.
 
 RULES:
 1. Find ALL product names from receipt
@@ -205,7 +207,7 @@ RULES:
    - Recreation > Pets pet products and services
    - Other Goods and Services > Personal care > Personal care services
 
-JSON:
+RESPOND WITH THIS JSON FORMAT:
 {
   "store_name": "store name",
   "items": [
@@ -236,13 +238,13 @@ JSON:
             print("LLM parsed raw OCR text:", cleaned_text)
             
             # Create the prompt
-            prompt = f"""Parse this receipt and extract products:
+            prompt = f"""Parse this receipt and extract all products:
 
 {cleaned_text}
 
-Return JSON with all products found."""
+You must respond with valid JSON containing the store name, all products found, and total amount."""
 
-            # Get response from Ollama with optimized settings for speed
+            # Get response from Ollama with more conservative settings
             try:
                 print("Sending request to LLM...")
                 response = self.client.chat(
@@ -251,12 +253,12 @@ Return JSON with all products found."""
                         {"role": "user", "content": f"{self.system_prompt}\n\n{prompt}"}
                     ],
                     options={
-                        "temperature": 0.0,  # Zero temperature for most consistent output
-                        "top_p": 0.8,
-                        "num_predict": 512,  # Much smaller for faster response
-                        "num_ctx": 1024,     # Smaller context window
-                        "repeat_penalty": 1.0, # No repetition penalty for speed
-                        "stop": ["```", "```json", "```\n", "\n\n\n"]  # Stop at code blocks
+                        "temperature": 0.1,  # Slight randomness for better output
+                        "top_p": 0.9,
+                        "num_predict": 1024,  # More tokens for complete response
+                        "num_ctx": 2048,     # Larger context window
+                        "repeat_penalty": 1.1, # Slight repetition penalty
+                        "stop": ["```", "```json"]  # Only stop at code blocks
                     }
                 )
                 print("LLM response received successfully")
