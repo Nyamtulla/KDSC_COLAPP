@@ -52,6 +52,10 @@ app = Flask(__name__)
 CORS(app, origins=[
     "https://nyamshaik.me",            # Your custom domain (HTTPS)
     "https://www.nyamshaik.me",        # Your custom domain with www
+    "http://nyamshaik.me",             # Your custom domain (HTTP)
+    "http://www.nyamshaik.me",         # Your custom domain with www (HTTP)
+    "https://api.nyamshaik.me",        # Your API domain (HTTPS)
+    "http://api.nyamshaik.me",         # Your API domain (HTTP)
     "https://nyamtull.github.io",      # Your GitHub Pages URL
     "https://nyamtull.github.io/KDSC_COLAPP", # Your specific project URL
     "http://localhost:3000",           # For local development
@@ -61,6 +65,25 @@ CORS(app, origins=[
     "http://127.0.0.1:3001",          # For local development (Flutter web)
     "http://127.0.0.1:8080"           # For local development
 ], supports_credentials=True, methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
+# Handle preflight requests
+@app.route('/login', methods=['OPTIONS'])
+def handle_login_preflight():
+    response = jsonify({'status': 'ok'})
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+# General OPTIONS handler for all routes
+@app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+@app.route('/<path:path>', methods=['OPTIONS'])
+def handle_options(path):
+    response = jsonify({'status': 'ok'})
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 # === Configure DB ===
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI', 'postgresql://postgres:colapp@host.docker.internal:5432/grocery_app_db')
