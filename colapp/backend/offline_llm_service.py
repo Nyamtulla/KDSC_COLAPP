@@ -189,7 +189,8 @@ CRITICAL RULES:
 4. Use 0.0 for missing prices, 1.0 for missing quantities
 5. Use null for missing fields like date, time, payment method
 6. Convert all prices to numbers (remove $ symbols)
-7. Categorize items using BLS Consumer Price Index categories:
+7. For store_name: Extract ONLY the business/store name (first line or header), NOT the entire receipt text
+8. Categorize items using BLS Consumer Price Index categories:
    - Food and Beverages > Food at home > [Cereals and bakery products, Meats poultry fish and eggs, Dairy and related products, Fruits and vegetables, Nonalcoholic beverages and beverage materials, Other food at home]
    - Food and Beverages > Food away from home > [Full service meals and snacks, Limited service meals and snacks, Food at employee sites and schools, Food at elementary and secondary schools, Food from vending machines and mobile vendors, Other food away from home]
    - Food and Beverages > Alcoholic beverages > [Beer ale and other malt beverages at home, Beer ale and other malt beverages away from home, Wine at home, Wine away from home, Distilled spirits at home, Distilled spirits away from home]
@@ -310,6 +311,45 @@ IMPORTANT: Focus on finding ALL products and use the exact BLS category paths li
             # Validate against schema
             validated_data = self._validate_and_clean_data(parsed_data)
             print("LLM validated_data:", validated_data)
+            
+            # Clean up store name to be shorter and more readable
+            if validated_data.get('store_name'):
+                store_name = validated_data['store_name']
+                
+                # If store name is too long, it's probably the entire receipt text
+                if len(store_name) > 200:
+                    # Try to extract just the store name from the beginning
+                    lines = store_name.split('\n')
+                    for line in lines[:3]:  # Check first 3 lines
+                        line = line.strip()
+                        if line and len(line) < 100 and not any(skip in line.upper() for skip in ['TOTAL', 'SUBTOTAL', 'TAX', 'CHANGE', 'ITEMS SOLD', 'DATE', 'TIME', 'RECEIPT']):
+                            store_name = line
+                            break
+                    else:
+                        # If no good line found, use a generic name
+                        store_name = "Unknown Store"
+                
+                # Extract just the main store name (before any extra details)
+                if ',' in store_name:
+                    store_name = store_name.split(',')[0]
+                if '(' in store_name:
+                    store_name = store_name.split('(')[0]
+                if ' - ' in store_name:
+                    store_name = store_name.split(' - ')[0]
+                if 'POS' in store_name:
+                    store_name = store_name.split('POS')[0]
+                if 'TOTAL' in store_name:
+                    store_name = store_name.split('TOTAL')[0]
+                
+                # Remove extra whitespace and special characters
+                store_name = ' '.join(store_name.split())
+                store_name = store_name.replace('_', ' ').replace('-', ' ')
+                
+                # Limit to reasonable length
+                if len(store_name) > 100:
+                    store_name = store_name[:97] + "..."
+                
+                validated_data['store_name'] = store_name
 
             # Clean and filter items
             cleaned_items = []
@@ -532,19 +572,58 @@ IMPORTANT: Focus on finding ALL products and use the exact BLS category paths li
     
 
     
+    def _extract_store_name(self, text: str) -> str:
+        """Extract store name from receipt text"""
+        import re
+        
+        # Common store patterns
+        store_patterns = {
+            r'WAL\s*MART|WALMART': 'Walmart',
+            r'TARGET': 'Target',
+            r'KROGER': 'Kroger',
+            r'MOMI.*CREPERIE|CREPERIE.*MOMI': 'Momi Creperie',
+            r'MCDONALD': 'McDonald\'s',
+            r'BURGER\s*KING': 'Burger King',
+            r'SUBWAY': 'Subway',
+            r'STARBUCKS': 'Starbucks',
+            r'COSTCO': 'Costco',
+            r'SAFEWAY': 'Safeway',
+            r'ALBERTSONS': 'Albertsons',
+            r'WHOLE\s*FOODS': 'Whole Foods',
+            r'TRADER\s*JOE': 'Trader Joe\'s',
+        }
+        
+        # Check for known store patterns first
+        for pattern, store_name in store_patterns.items():
+            if re.search(pattern, text, re.IGNORECASE):
+                return store_name
+        
+        # Try to extract from first few lines
+        lines = text.split('\n')
+        for line in lines[:3]:
+            line = line.strip()
+            if line and len(line) < 80:
+                # Skip lines that are clearly not store names
+                if any(skip in line.upper() for skip in ['TOTAL', 'SUBTOTAL', 'TAX', 'CHANGE', 'ITEMS SOLD', 'DATE', 'TIME', 'RECEIPT', 'POS', 'CASH', 'DEBIT', 'CREDIT', 'BILL']):
+                    continue
+                # Skip lines that are just numbers or prices
+                if re.match(r'^[\d\s\.\$]+$', line):
+                    continue
+                # Clean up the line
+                clean_line = re.sub(r'[^\w\s\-\.]', ' ', line)
+                clean_line = ' '.join(clean_line.split())
+                if clean_line and len(clean_line) < 50:
+                    return clean_line
+        
+        return "Unknown Store"
+
     def _fallback_parse_receipt(self, text: str) -> Dict[str, Any]:
         """Fallback parsing when LLM times out - use simple regex patterns"""
         try:
             import re
             
-            # Extract store name
-            store_name = "Unknown Store"
-            if "WAL MART" in text.upper() or "WALMART" in text.upper():
-                store_name = "Walmart"
-            elif "TARGET" in text.upper():
-                store_name = "Target"
-            elif "KROGER" in text.upper():
-                store_name = "Kroger"
+            # Extract store name using the dedicated method
+            store_name = self._extract_store_name(text)
             
             # Extract total amount
             total_match = re.search(r'TOTAL.*?(\d+\.?\d*)', text, re.IGNORECASE)
@@ -574,6 +653,10 @@ IMPORTANT: Focus on finding ALL products and use the exact BLS category paths li
                             'total_price': price,
                             'category': 'Food and Beverages > Food at home > Other food at home'
                         })
+            
+            # Truncate store name to fit database field
+            if len(store_name) > 200:
+                store_name = store_name[:197] + "..."
             
             return {
                 'success': True,
