@@ -31,11 +31,22 @@ class _HierarchicalCategoryPickerState extends State<HierarchicalCategoryPicker>
     if (widget.selectedCategory != null) {
       final parts = widget.selectedCategory!.split(' > ');
       if (parts.isNotEmpty) {
-        selectedLevel1 = parts[0];
-        if (parts.length > 1) {
-          selectedLevel2 = parts[1];
-          if (parts.length > 2) {
-            selectedLevel3 = parts[2];
+        // Validate level 1 exists in hierarchy
+        if (widget.categoryHierarchy.containsKey(parts[0])) {
+          selectedLevel1 = parts[0];
+          
+          if (parts.length > 1) {
+            final level2Map = widget.categoryHierarchy[parts[0]] as Map<String, dynamic>?;
+            if (level2Map != null && level2Map.containsKey(parts[1])) {
+              selectedLevel2 = parts[1];
+              
+              if (parts.length > 2) {
+                final level3List = level2Map[parts[1]] as List<String>?;
+                if (level3List != null && level3List.contains(parts[2])) {
+                  selectedLevel3 = parts[2];
+                }
+              }
+            }
           }
         }
       }
@@ -145,8 +156,17 @@ class _HierarchicalCategoryPickerState extends State<HierarchicalCategoryPicker>
     List<String> options,
     Function(String?) onChanged,
   ) {
+    // Remove duplicates and null values
+    final uniqueOptions = options.where((option) => option != null && option.isNotEmpty).toSet().toList();
+    
+    // Validate selected value exists in options
+    String? validSelectedValue = selectedValue;
+    if (selectedValue != null && !uniqueOptions.contains(selectedValue)) {
+      validSelectedValue = null;
+    }
+    
     // Handle empty options
-    if (options.isEmpty) {
+    if (uniqueOptions.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
@@ -173,6 +193,7 @@ class _HierarchicalCategoryPickerState extends State<HierarchicalCategoryPicker>
         ),
       );
     }
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -191,7 +212,7 @@ class _HierarchicalCategoryPickerState extends State<HierarchicalCategoryPicker>
           ),
           Expanded(
             child: DropdownButton<String>(
-              value: selectedValue,
+              value: validSelectedValue,
               hint: Text('Select $label'),
               isExpanded: true,
               underline: const SizedBox(),
@@ -200,7 +221,7 @@ class _HierarchicalCategoryPickerState extends State<HierarchicalCategoryPicker>
                   value: null,
                   child: Text('Select $label'),
                 ),
-                ...options.map((option) => DropdownMenuItem<String>(
+                ...uniqueOptions.map((option) => DropdownMenuItem<String>(
                   value: option,
                   child: Text(option),
                 )),

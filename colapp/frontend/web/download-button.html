@@ -1,0 +1,72 @@
+<!-- ColApp Download Button Component -->
+<style>
+    .colapp-download-btn {
+        display: inline-block;
+        background: linear-gradient(45deg, #0051BA, #EC944A);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 25px;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 16px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 81, 186, 0.3);
+        border: none;
+        cursor: pointer;
+    }
+
+    .colapp-download-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 81, 186, 0.4);
+        color: white;
+        text-decoration: none;
+    }
+
+    .colapp-download-btn:active {
+        transform: translateY(0);
+    }
+
+    .colapp-download-btn .icon {
+        margin-right: 8px;
+        font-size: 18px;
+    }
+
+    .colapp-download-btn .text {
+        vertical-align: middle;
+    }
+
+    .colapp-download-btn .size {
+        font-size: 12px;
+        opacity: 0.9;
+        margin-left: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .colapp-download-btn {
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+        
+        .colapp-download-btn .size {
+            display: block;
+            margin-left: 0;
+            margin-top: 4px;
+        }
+    }
+</style>
+
+<!-- Download Button HTML -->
+<a href="download/ColApp.apk" class="colapp-download-btn" download>
+    <span class="icon">📱</span>
+    <span class="text">Download ColApp</span>
+    <span class="size">66.4 MB</span>
+</a>
+
+<!-- Alternative: Direct download link -->
+<!-- 
+<a href="download/ColApp.apk" class="colapp-download-btn" download>
+    <span class="icon">📱</span>
+    <span class="text">Download APK</span>
+    <span class="size">66.4 MB</span>
+</a>
+--> 

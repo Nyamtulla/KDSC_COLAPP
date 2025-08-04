@@ -5,17 +5,16 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiService {
-  // Use different URLs for web vs mobile
+  // Use production URL for all platforms
   static String get baseUrl {
-    if (kIsWeb) {
-      // Production URL - update this with your actual production API URL
-      return 'https://api.nyamshaik.me'; // For production (HTTPS)
-      // return 'http://api.nyamshaik.me'; // For production (HTTP) - fallback if needed
-      // return 'http://localhost:5000'; // For local testing (HTTP)
-    } else {
-      // For Android emulator, use 10.0.2.2 to access host machine
-      return 'http://10.0.2.2:5000';
-    }
+    // Production URL - your GCP VM server
+    return 'https://api.nyamshaik.me'; // For production (HTTPS)
+    // Uncomment below for local development if needed:
+    // if (kIsWeb) {
+    //   return 'http://localhost:5000'; // For local testing (HTTP)
+    // } else {
+    //   return 'http://10.0.2.2:5000'; // For Android emulator
+    // }
   }
   static String? _authToken;
   
