@@ -138,6 +138,8 @@
     </a>
   </div>
 
+
+
   <script>
     // Close banner functionality
     function closeDownloadBanner() {
@@ -145,23 +147,53 @@
       banner.style.display = 'none';
       document.body.style.paddingTop = '0';
       localStorage.setItem('colapp-banner-closed', 'true');
+      localStorage.setItem('colapp-banner-closed-time', Date.now().toString());
     }
 
-    // Check if banner was previously closed
-    if (localStorage.getItem('colapp-banner-closed') === 'true') {
-      document.getElementById('downloadBanner').style.display = 'none';
-      document.body.style.paddingTop = '0';
-    }
+
 
     // Detect mobile devices and show banner
     function isMobile() {
       return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
 
-    // Show banner for mobile users or if not previously closed
-    if (isMobile() || localStorage.getItem('colapp-banner-closed') !== 'true') {
+    // Show banner logic - more user-friendly
+    function shouldShowBanner() {
+      const isMobileDevice = isMobile();
+      const wasClosed = localStorage.getItem('colapp-banner-closed') === 'true';
+      const closedTime = localStorage.getItem('colapp-banner-closed-time');
+      
+      // Always show for mobile users
+      if (isMobileDevice) {
+        return true;
+      }
+      
+      // For desktop users, show if:
+      // 1. Never closed before, OR
+      // 2. Closed more than 24 hours ago
+      if (!wasClosed) {
+        return true;
+      }
+      
+      if (closedTime) {
+        const closedDate = new Date(parseInt(closedTime));
+        const now = new Date();
+        const hoursSinceClosed = (now - closedDate) / (1000 * 60 * 60);
+        
+        // Show again after 24 hours
+        if (hoursSinceClosed >= 24) {
+          return true;
+        }
+      }
+      
+      return false;
+    }
+
+    // Apply banner visibility
+    if (shouldShowBanner()) {
       document.getElementById('downloadBanner').style.display = 'block';
     } else {
+      document.getElementById('downloadBanner').style.display = 'none';
       document.body.style.paddingTop = '0';
     }
 
